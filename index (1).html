@@ -1,0 +1,3737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart GST Tracker — EDW</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg:       #0D1117;
+    --surface:  #161B22;
+    --card:     #1C2128;
+    --border:   #30363D;
+    --accent:   #F0B429;
+    --green:    #3DDC84;
+    --red:      #FF6B6B;
+    --purple:   #A78BFA;
+    --text:     #E6EDF3;
+    --muted:    #8B949E;
+    --income-bg:#0D2218;
+    --expense-bg:#2A0D0D;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+  /* ── SPLASH SCREEN ── */
+  #splash {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; gap: 20px;
+    animation: splashFade 0.4s ease 2.2s forwards;
+  }
+  @keyframes splashFade { to { opacity: 0; pointer-events: none; } }
+
+  .splash-logo {
+    width: 96px; height: 96px;
+    background: var(--accent);
+    border-radius: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px;
+    box-shadow: 0 0 60px rgba(240,180,41,0.4);
+    animation: logoPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.3s both;
+  }
+  @keyframes logoPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .splash-edw {
+    font-family: 'DM Serif Display', serif;
+    font-size: 42px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    animation: fadeUp 0.5s ease 0.7s both;
+  }
+  .splash-full {
+    font-size: 13px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase;
+    animation: fadeUp 0.5s ease 0.9s both;
+  }
+  .splash-app {
+    font-size: 15px; color: var(--text); font-weight: 600; margin-top: 4px;
+    animation: fadeUp 0.5s ease 1.1s both;
+  }
+  .splash-ver {
+    font-size: 11px; color: var(--muted);
+    animation: fadeUp 0.5s ease 1.3s both;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
+    border-bottom: 2px solid var(--accent);
+    padding: 16px 24px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  .header-inner {
+    max-width: 640px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 42px; height: 42px; background: var(--accent); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .logo-text h1 { font-family: 'DM Serif Display', serif; font-size: 17px; color: var(--text); line-height: 1.1; }
+  .logo-text p { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* ── HAMBURGER ── */
+  .hamburger-btn {
+    width: 40px; height: 40px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; cursor: pointer; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 5px; flex-shrink: 0;
+  }
+  .hamburger-btn span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 2px; transition: all 0.2s; }
+
+  /* ── DRAWER ── */
+  #drawer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  #drawer-overlay.open { opacity: 1; pointer-events: all; }
+  #drawer {
+    position: fixed; top: 0; right: -320px; width: 300px; height: 100vh;
+    background: var(--surface); border-left: 1px solid var(--border);
+    z-index: 201; transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+  #drawer.open { right: 0; }
+  .drawer-header {
+    padding: 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .drawer-header h2 { font-size: 15px; font-weight: 700; color: var(--text); }
+  .drawer-close {
+    width: 30px; height: 30px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; font-size: 16px; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .drawer-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .drawer-section-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 12px; }
+  .drawer-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 10px; cursor: pointer; transition: background 0.15s;
+  }
+  .drawer-row:hover { background: var(--card); }
+  .drawer-row-icon { font-size: 18px; width: 28px; text-align: center; }
+  .drawer-row-label { font-size: 13px; color: var(--text); font-weight: 500; }
+  .drawer-row-sub { font-size: 11px; color: var(--muted); }
+  .conn-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    background: rgba(61,220,132,0.12); color: var(--green); width: 100%;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .dot.green { background: var(--green); animation: pulse 2s infinite; }
+  .dot.red { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .drawer-version {
+    padding: 16px 20px;
+    font-size: 11px; color: var(--muted); text-align: center; border-top: 1px solid var(--border);
+  }
+  .drawer-delete-btn {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 10px; cursor: pointer; transition: background 0.15s;
+    color: var(--red); width: 100%; background: none; border: none;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  }
+  .drawer-delete-btn:hover { background: var(--expense-bg); }
+
+  /* ── WHATS NEW MODAL ── */
+  #whats-new-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  #whats-new-modal.open { display: flex; }
+  .whats-new-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    width: 100%; max-width: 400px; max-height: 80vh; overflow-y: auto;
+  }
+  .whats-new-header {
+    padding: 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .whats-new-header h2 { font-size: 16px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+  .wn-close { background: var(--card); border: 1px solid var(--border); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; color: var(--muted); font-size: 16px; display: flex; align-items: center; justify-content: center; }
+  .wn-version-block { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .wn-version-block:last-child { border-bottom: none; }
+  .wn-ver-tag { font-size: 11px; font-weight: 700; color: var(--accent); background: rgba(240,180,41,0.1); border: 1px solid rgba(240,180,41,0.3); border-radius: 6px; padding: 3px 8px; display: inline-block; margin-bottom: 10px; }
+  .wn-item { display: flex; gap: 10px; padding: 5px 0; font-size: 13px; color: var(--text); line-height: 1.4; }
+  .wn-item::before { content: '✦'; color: var(--accent); font-size: 10px; margin-top: 3px; flex-shrink: 0; }
+  .wn-clicks-left { font-size: 11px; color: var(--muted); text-align: center; padding: 14px; border-top: 1px solid var(--border); }
+  .wn-clicks-left span { color: var(--accent); font-weight: 700; }
+
+  /* ── MY LOGS MODAL ── */
+  #logs-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300;
+    display: none; align-items: flex-start; justify-content: center; padding: 20px;
+    overflow-y: auto;
+  }
+  #logs-modal.open { display: flex; }
+  .logs-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    width: 100%; max-width: 500px; margin: auto;
+  }
+  .logs-header {
+    padding: 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .logs-header h2 { font-size: 16px; font-weight: 700; color: var(--text); }
+  .logs-close { background: var(--card); border: 1px solid var(--border); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; color: var(--muted); font-size: 16px; display: flex; align-items: center; justify-content: center; }
+  .logs-filter { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+  .logs-filter select { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif; }
+  .logs-filter button { background: var(--accent); color: #0D1117; border: none; border-radius: 8px; padding: 9px 16px; font-size: 12px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; }
+  .logs-body { padding: 16px 20px; max-height: 60vh; overflow-y: auto; }
+  .log-entry { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .log-entry:last-child { border-bottom: none; }
+  .log-entry-left { flex: 1; }
+  .log-entry-desc { font-size: 13px; color: var(--text); font-weight: 500; }
+  .log-entry-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .log-entry-amt { font-size: 14px; font-weight: 700; }
+  .log-empty-msg { text-align: center; color: var(--muted); font-size: 13px; padding: 32px 0; }
+
+  /* ── MANAGE CATEGORIES MODAL ── */
+  #cat-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  #cat-modal.open { display: flex; }
+  .cat-modal-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto;
+  }
+  .cat-modal-header {
+    padding: 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cat-modal-header h2 { font-size: 16px; font-weight: 700; color: var(--text); }
+  .cat-modal-close { background: var(--card); border: 1px solid var(--border); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; color: var(--muted); font-size: 16px; display: flex; align-items: center; justify-content: center; }
+  .cat-modal-body { padding: 16px 20px; }
+  .cat-add-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .cat-add-input {
+    flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); padding: 11px 14px; font-size: 14px; font-family: 'DM Sans', sans-serif;
+  }
+  .cat-add-input:focus { outline: none; border-color: var(--accent); }
+  .cat-add-btn {
+    background: var(--accent); color: #0D1117; border: none; border-radius: 10px;
+    padding: 11px 16px; font-size: 13px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer;
+  }
+  .cat-detected { font-size: 12px; color: var(--green); margin-bottom: 14px; padding: 8px 12px; background: var(--income-bg); border-radius: 8px; display: none; }
+  .cat-list-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; background: var(--card); border-radius: 10px; margin-bottom: 8px;
+    border: 1px solid var(--border); cursor: grab; user-select: none; transition: opacity 0.2s, transform 0.15s, border-color 0.15s;
+  }
+  .cat-list-item.dragging  { opacity: 0.4; transform: scale(0.97); cursor: grabbing; }
+  .cat-list-item.drag-over { border-color: var(--accent); background: rgba(240,180,41,0.07); }
+  .cat-drag-handle { font-size: 15px; color: var(--muted); margin-right: 8px; cursor: grab; touch-action: none; }
+  .cat-list-left { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); }
+  .cat-list-icon { font-size: 20px; }
+  .cat-delete-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px;
+    padding: 4px 8px; border-radius: 6px; transition: color 0.15s;
+  }
+  .cat-delete-btn:hover { color: var(--red); }
+  .cat-default-tag { font-size: 9px; color: var(--muted); background: var(--border); border-radius: 4px; padding: 2px 6px; margin-left: 6px; }
+
+  /* ── MAIN ── */
+  main { max-width: 640px; margin: 0 auto; padding: 20px 16px 100px; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex; gap: 8px; margin-bottom: 24px;
+    background: var(--surface); border-radius: 14px; padding: 6px; border: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1; padding: 10px; border-radius: 10px; border: none; background: transparent;
+    color: var(--muted); font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+  .tab.active-income { background: var(--income-bg); color: var(--green); border: 1px solid var(--green); }
+  .tab.active-expense { background: var(--expense-bg); color: var(--red); border: 1px solid var(--red); }
+  .tab.active-logs { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .tab.active-progress { background: rgba(167,139,250,0.12); color: var(--purple); border: 1px solid var(--purple); }
+
+  /* ── CARD ── */
+  .card { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); padding: 22px; margin-bottom: 16px; }
+  .card-title { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+  .card-title span { font-size: 16px; }
+
+  /* ── FORM FIELDS ── */
+  .field { margin-bottom: 16px; }
+  label { display: block; font-size: 11.5px; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; font-weight: 600; margin-bottom: 7px; }
+  input[type="number"], input[type="text"], input[type="password"], select, textarea {
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); padding: 13px 16px; font-size: 15px; font-family: 'DM Sans', sans-serif;
+    transition: border-color 0.2s; -webkit-appearance: none;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  select option { background: var(--card); color: var(--text); }
+  textarea { resize: vertical; min-height: 72px; }
+
+  /* ── AMOUNT PILLS ── */
+  .amount-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+  .amount-pill { background: var(--card); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); }
+  .amount-pill .pill-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 4px; }
+  .amount-pill .pill-value { font-size: 20px; font-weight: 700; }
+  .pill-gst .pill-value { color: var(--purple); }
+  .pill-exgst .pill-value { color: var(--accent); }
+
+  /* ── PERIOD SELECTOR ── */
+  .period-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .period-option { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 13px; font-family: 'DM Sans', sans-serif; cursor: pointer; text-align: center; transition: all 0.18s; }
+  .period-option.selected-income { border-color: var(--green); color: var(--green); background: var(--income-bg); }
+
+  /* ── CATEGORY GRID ── */
+  .cat-grid-wrap { position: relative; }
+  .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .cat-btn { padding: 10px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 11px; font-family: 'DM Sans', sans-serif; cursor: pointer; text-align: center; line-height: 1.3; transition: all 0.18s; }
+  .cat-btn.selected { border-color: var(--red); color: var(--red); background: var(--expense-bg); }
+  .cat-icon { font-size: 18px; display: block; margin-bottom: 3px; }
+  .manage-cats-btn { font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; padding: 4px 0; text-decoration: underline; display: block; margin-bottom: 12px; }
+
+  /* ── SUBMIT ── */
+  .submit-btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; letter-spacing: 0.03em; transition: all 0.2s; margin-top: 8px; }
+  .submit-income { background: var(--green); color: #0D1117; }
+  .submit-expense { background: var(--red); color: #fff; }
+  .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+  .submit-btn:active { transform: translateY(0); }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* ── LOG ── */
+  .log-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 32px 0; }
+  .log-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); animation: slideIn 0.3s ease; }
+  .log-item:last-child { border-bottom: none; }
+  .log-left { flex: 1; }
+  .log-desc { font-size: 13.5px; color: var(--text); font-weight: 500; }
+  .log-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .log-amount { font-size: 15px; font-weight: 700; }
+  .log-income { color: var(--green); }
+  .log-expense { color: var(--red); }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── TOAST ── */
+  #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 22px; font-size: 13.5px; font-weight: 500; box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); max-width: 320px; text-align: center; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error { border-color: var(--red); color: var(--red); }
+  #toast.info { border-color: var(--purple); color: var(--purple); }
+
+  .month-select-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .month-select-row select { flex: 1; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* ── SHEET SYNC ── */
+  .sync-month-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-radius: 10px; background: var(--card);
+    border: 1px solid var(--border); margin-bottom: 8px;
+  }
+  .sync-month-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .sync-month-vals { display: flex; gap: 14px; font-size: 12px; }
+  .sync-inc  { color: var(--green); }
+  .sync-exp  { color: var(--red); }
+  .sync-gst  { color: var(--purple); }
+  .sync-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(167,139,250,0.12); color: var(--purple);
+    border: 1px solid rgba(167,139,250,0.3); border-radius: 6px;
+    font-size: 10px; font-weight: 700; padding: 3px 8px; margin-left: 8px;
+    vertical-align: middle;
+  }
+  .sync-summary {
+    padding: 14px; background: rgba(61,220,132,0.07); border: 1px solid rgba(61,220,132,0.2);
+    border-radius: 12px; margin-bottom: 14px; font-size: 13px; color: var(--green); font-weight: 600;
+  }
+  .sync-error-box {
+    padding: 14px; background: var(--expense-bg); border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 12px; font-size: 13px; color: var(--red); line-height: 1.6;
+  }
+
+  /* ── PROGRESS / GAMIFICATION ── */
+  .rank-card {
+    background: var(--card); border-radius: 14px; border: 1px solid var(--border);
+    padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 14px;
+    transition: transform 0.15s;
+  }
+  .rank-card:hover { transform: translateY(-2px); }
+  .rank-medal { font-size: 28px; width: 44px; text-align: center; flex-shrink: 0; }
+  .rank-num { font-size: 11px; color: var(--muted); font-weight: 700; }
+  .rank-month { font-size: 15px; font-weight: 700; color: var(--text); }
+  .rank-profit { font-size: 18px; font-weight: 700; color: var(--green); }
+  .rank-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .rank-badge { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-top: 4px; }
+  .rank-badge.gold { background: rgba(240,180,41,0.15); color: var(--accent); border: 1px solid rgba(240,180,41,0.3); }
+  .rank-badge.silver { background: rgba(167,139,250,0.12); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+  .rank-badge.bronze { background: rgba(255,107,107,0.1); color: var(--red); border: 1px solid rgba(255,107,107,0.3); }
+  .progress-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .progress-stat { background: var(--card); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
+  .progress-stat .ps-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .progress-stat .ps-val { font-size: 18px; font-weight: 700; }
+  .chart-wrap { position: relative; height: 220px; margin-bottom: 8px; }
+  .progress-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .progress-tab { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 12px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.18s; text-align: center; }
+  .progress-tab.active { background: rgba(167,139,250,0.12); color: var(--purple); border-color: var(--purple); }
+  .streak-wrap { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--card); border-radius: 12px; border: 1px solid var(--border); margin-bottom: 16px; }
+  .streak-icon { font-size: 28px; }
+  .streak-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+  .streak-val { font-size: 20px; font-weight: 700; color: var(--accent); }
+
+  /* ── PIN / SETTINGS / PRIVACY MODAL SHARED ── */
+  .generic-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 400;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .generic-modal.open { display: flex; }
+  .modal-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    width: 100%; max-width: 380px; max-height: 85vh; overflow-y: auto;
+  }
+  .modal-header {
+    padding: 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-header h2 { font-size: 16px; font-weight: 700; color: var(--text); }
+  .modal-close { background: var(--card); border: 1px solid var(--border); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; color: var(--muted); font-size: 16px; display: flex; align-items: center; justify-content: center; }
+  .modal-body { padding: 20px; }
+  .modal-section-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 10px; margin-top: 18px; }
+  .modal-section-title:first-child { margin-top: 0; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 13px; color: var(--text); }
+  .toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: background 0.2s; }
+  .toggle-slider:before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: var(--text); border-radius: 50%; transition: transform 0.2s; }
+  .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+  .pin-dots { display: flex; gap: 12px; justify-content: center; margin: 20px 0; }
+  .pin-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--border); transition: background 0.15s; }
+  .pin-dot.filled { background: var(--accent); }
+  .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .pin-key { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; font-size: 18px; font-weight: 600; font-family: 'DM Sans', sans-serif; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
+  .pin-key:hover { background: var(--surface); border-color: var(--accent); }
+  .pin-key:active { transform: scale(0.95); }
+  .pin-key.del { color: var(--red); }
+  .pin-hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+  .settings-btn {
+    width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 13px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif; cursor: pointer; text-align: left; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+  }
+  .settings-btn:hover { background: var(--surface); }
+  .settings-btn.danger { color: var(--red); border-color: rgba(255,107,107,0.3); }
+  .settings-btn.danger:hover { background: var(--expense-bg); }
+  .privacy-p { font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 12px; }
+  .privacy-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(61,220,132,0.1); border: 1px solid rgba(61,220,132,0.3); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--green); margin-bottom: 12px; }
+  .gst-rate-row { display: flex; align-items: center; gap: 10px; }
+  .gst-rate-input { width: 90px !important; text-align: center; font-weight: 700; font-size: 20px !important; }
+  .gst-rate-save { background: var(--accent); color: #0D1117; border: none; border-radius: 10px; padding: 13px 18px; font-size: 13px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+
+  /* ── PIN LOCK SCREEN ── */
+  #pin-lock {
+    position: fixed; inset: 0; background: var(--bg); z-index: 9998;
+    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    padding: 30px;
+  }
+  #pin-lock.active { display: flex; }
+  .pin-lock-logo { width: 72px; height: 72px; background: var(--accent); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 8px; }
+  .pin-lock-title { font-size: 20px; font-weight: 700; color: var(--text); }
+  .pin-lock-sub { font-size: 13px; color: var(--muted); }
+  .pin-lock-error { font-size: 12px; color: var(--red); min-height: 18px; text-align: center; }
+
+  /* ── CONFIRM MODAL ── */
+  #confirm-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 500;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  #confirm-modal.open { display: flex; }
+  .confirm-box { background: var(--surface); border: 1px solid var(--red); border-radius: 20px; width: 100%; max-width: 340px; padding: 28px; text-align: center; }
+  .confirm-icon { font-size: 40px; margin-bottom: 12px; }
+  .confirm-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .confirm-msg { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 24px; }
+  .confirm-btns { display: flex; gap: 10px; }
+  .confirm-cancel { flex: 1; padding: 13px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+  .confirm-delete { flex: 1; padding: 13px; border-radius: 10px; border: none; background: var(--red); color: #fff; font-size: 14px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+
+  /* ── SETUP SCREEN ── */
+  #setup-screen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 9997;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 30px; overflow-y: auto;
+  }
+  #setup-screen.active { display: flex; }
+  .setup-box {
+    width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 20px;
+  }
+  .setup-logo {
+    width: 72px; height: 72px; background: var(--accent); border-radius: 20px;
+    display: flex; align-items: center; justify-content: center; font-size: 36px;
+    margin: 0 auto 4px;
+  }
+  .setup-title {
+    font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--accent);
+    text-align: center; line-height: 1.2;
+  }
+  .setup-sub { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.6; }
+  .setup-step {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+    margin-bottom: 12px;
+  }
+  .setup-step-num {
+    width: 26px; height: 26px; background: var(--accent); color: #0D1117;
+    border-radius: 50%; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px; flex-shrink: 0;
+  }
+  .setup-step-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .setup-step-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .setup-step-desc a { color: var(--accent); }
+  .setup-url-input {
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); padding: 13px 16px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+    margin-top: 12px; transition: border-color 0.2s;
+  }
+  .setup-url-input:focus { outline: none; border-color: var(--accent); }
+  .setup-url-input::placeholder { color: var(--muted); }
+  .setup-save-btn {
+    width: 100%; padding: 16px; border-radius: 12px; border: none;
+    background: var(--accent); color: #0D1117; font-size: 15px; font-weight: 700;
+    font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s;
+  }
+  .setup-save-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(240,180,41,0.3); }
+  .setup-error { font-size: 12px; color: var(--red); text-align: center; min-height: 18px; }
+  .setup-skip { font-size: 12px; color: var(--muted); text-align: center; cursor: pointer; text-decoration: underline; }
+  .setup-skip:hover { color: var(--text); }
+
+  @media (max-width: 400px) {
+    .cat-grid { grid-template-columns: repeat(2, 1fr); }
+    .period-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── SPLASH ── -->
+<div id="splash">
+  <div class="splash-logo">💰</div>
+  <div class="splash-edw">EDW</div>
+  <div class="splash-full">Endless Digital World</div>
+  <div class="splash-app">Smart GST Tracker</div>
+  <div class="splash-ver">Version 1.8.2</div>
+</div>
+
+<!-- ── FIRST-TIME SETUP SCREEN ── -->
+<div id="setup-screen">
+  <div class="setup-box">
+
+    <!-- Welcome hero -->
+    <div style="text-align:center;margin-bottom:28px;">
+      <div class="setup-logo">💰</div>
+      <div class="setup-title">Welcome to Smart GST Tracker</div>
+      <div class="setup-sub">by Endless Digital World</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);border-radius:20px;padding:6px 14px;margin-top:10px;">
+        <span style="font-size:11px;color:var(--green);font-weight:600;">🇦🇺 Built for Australian Small Businesses &amp; Sole Traders</span>
+      </div>
+    </div>
+
+    <!-- Feature pills -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px;">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+        <span>📊</span> GST auto-calculated
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+        <span>🏆</span> Gamified progress
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+        <span>☁️</span> Syncs to Google Sheets
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+        <span>🔒</span> Your data, your account
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div style="border-top:1px solid var(--border);margin-bottom:20px;"></div>
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;">⚡ Quick Setup — 3 easy steps</div>
+
+    <div class="setup-step">
+      <div class="setup-step-num">1</div>
+      <div>
+        <div class="setup-step-title">Open your Google Sheet</div>
+        <div class="setup-step-desc">Use the link in your Etsy purchase to open the Smart GST Tracker sheet. Click <strong style="color:var(--text);">File → Make a copy</strong> to save it to your own Google Drive.</div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-step-num">2</div>
+      <div>
+        <div class="setup-step-title">Deploy your Apps Script</div>
+        <div class="setup-step-desc">
+          In your sheet go to <strong style="color:var(--text);">Extensions → Apps Script</strong>. Click <strong style="color:var(--text);">Deploy → New deployment</strong>, choose <strong style="color:var(--text);">Web app</strong>, set "Who has access" to <strong style="color:var(--text);">Anyone</strong>, then Deploy. Copy the URL it gives you.<br><br>
+          <span style="color:var(--accent);font-size:11px;">📄 Full step-by-step guide included in your purchase download.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-step-num">3</div>
+      <div>
+        <div class="setup-step-title">Paste your Apps Script URL below</div>
+        <div class="setup-step-desc">This links the app to your own private Google Sheet. EDW never sees your data.</div>
+        <input type="text" class="setup-url-input" id="setup-url-input"
+          placeholder="https://script.google.com/macros/s/…/exec">
+      </div>
+    </div>
+
+    <div class="setup-error" id="setup-error"></div>
+    <button class="setup-save-btn" onclick="saveSetupUrl()">Connect My Sheet ➔</button>
+    <div class="setup-skip" onclick="skipSetup()">Skip for now — use without Google Sheets</div>
+
+    <div style="margin-top:20px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:11px;color:var(--muted);line-height:1.6;">
+        Need help? Contact us at <strong style="color:var(--accent);">endlessdigitalworld@gmail.com</strong><br>
+        or leave a message on your Etsy order.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PIN LOCK SCREEN ── -->
+<div id="pin-lock">
+  <div class="pin-lock-logo">🔐</div>
+  <div class="pin-lock-title">Smart GST Tracker</div>
+  <div class="pin-lock-sub">Enter your 4-digit PIN to continue</div>
+  <div class="pin-dots" id="lock-dots">
+    <div class="pin-dot" id="ld0"></div>
+    <div class="pin-dot" id="ld1"></div>
+    <div class="pin-dot" id="ld2"></div>
+    <div class="pin-dot" id="ld3"></div>
+  </div>
+  <div class="pin-lock-error" id="lock-error"></div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="pinLockKey('1')">1</button>
+    <button class="pin-key" onclick="pinLockKey('2')">2</button>
+    <button class="pin-key" onclick="pinLockKey('3')">3</button>
+    <button class="pin-key" onclick="pinLockKey('4')">4</button>
+    <button class="pin-key" onclick="pinLockKey('5')">5</button>
+    <button class="pin-key" onclick="pinLockKey('6')">6</button>
+    <button class="pin-key" onclick="pinLockKey('7')">7</button>
+    <button class="pin-key" onclick="pinLockKey('8')">8</button>
+    <button class="pin-key" onclick="pinLockKey('9')">9</button>
+    <button class="pin-key" onclick="pinLockKey('0')">0</button>
+    <button class="pin-key del" onclick="pinLockDel()">⌫</button>
+  </div>
+</div>
+
+<!-- ── DRAWER OVERLAY ── -->
+<div id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- ── DRAWER ── -->
+<div id="drawer">
+  <div class="drawer-header">
+    <h2>⚙️ Menu</h2>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div style="padding:12px 20px 0;border-bottom:1px solid var(--border);">
+    <div id="drawer-profile-name" style="font-size:13px;color:var(--muted);padding-bottom:12px;"></div>
+  </div>
+
+  <div class="drawer-section">
+    <div class="drawer-section-title">Connection</div>
+    <div class="conn-pill">
+      <div class="dot green" id="drawer-dot"></div>
+      <span id="drawer-conn-text">Sheets connected</span>
+    </div>
+  </div>
+
+  <div class="drawer-section">
+    <div class="drawer-section-title">Features</div>
+    <div class="drawer-row" onclick="openLogsModal(); closeDrawer();">
+      <div class="drawer-row-icon">📂</div>
+      <div>
+        <div class="drawer-row-label">My Logs</div>
+        <div class="drawer-row-sub">View entries · Export PDF · Manage data</div>
+      </div>
+    </div>
+    <div class="drawer-row" onclick="openMyDocuments(); closeDrawer();">
+      <div class="drawer-row-icon">📁</div>
+      <div>
+        <div class="drawer-row-label">My Documents</div>
+        <div class="drawer-row-sub">Receipts & saved files</div>
+      </div>
+    </div>
+    <div class="drawer-row" onclick="openCatModal(); closeDrawer();">
+      <div class="drawer-row-icon">🗂️</div>
+      <div>
+        <div class="drawer-row-label">Manage Categories</div>
+        <div class="drawer-row-sub">Add or remove expense categories</div>
+      </div>
+    </div>
+    <div class="drawer-row" onclick="switchTab('progress'); closeDrawer();">
+      <div class="drawer-row-icon">🏆</div>
+      <div>
+        <div class="drawer-row-label">My Progress</div>
+        <div class="drawer-row-sub">Rankings, charts & monthly stats</div>
+      </div>
+    </div>
+    <div class="drawer-row" id="whats-new-row" onclick="openWhatsNew(); closeDrawer();">
+      <div class="drawer-row-icon">✨</div>
+      <div>
+        <div class="drawer-row-label" id="wn-label">What's New</div>
+        <div class="drawer-row-sub" id="wn-sub-text">See latest updates</div>
+      </div>
+    </div>
+    <div class="drawer-row" onclick="openAboutApp(); closeDrawer();">
+      <div class="drawer-row-icon">ℹ️</div>
+      <div>
+        <div class="drawer-row-label">About This App</div>
+        <div class="drawer-row-sub">Features, tips & how everything works</div>
+      </div>
+    </div>
+    <div class="drawer-row" onclick="openRewardsModal(); closeDrawer();">
+      <div class="drawer-row-icon">🏅</div>
+      <div>
+        <div class="drawer-row-label">Rewards & Points</div>
+        <div class="drawer-row-sub" id="drawer-points-sub">Earn points for logging income</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer-section">
+    <div class="drawer-section-title">App</div>
+    <div class="drawer-row" onclick="openSettings(); closeDrawer();">
+      <div class="drawer-row-icon">⚙️</div>
+      <div>
+        <div class="drawer-row-label">Settings</div>
+        <div class="drawer-row-sub">PIN, GST rate & Sheet URL</div>
+      </div>
+    </div>
+    <div class="drawer-row" onclick="openHelpModal(); closeDrawer();">
+      <div class="drawer-row-icon">🆘</div>
+      <div>
+        <div class="drawer-row-label">Help & Support</div>
+        <div class="drawer-row-sub">Email us — reply within 7 business days</div>
+      </div>
+    </div>
+    <div class="drawer-row" onclick="openPrivacy(); closeDrawer();">
+      <div class="drawer-row-icon">🔒</div>
+      <div>
+        <div class="drawer-row-label">Privacy Policy</div>
+        <div class="drawer-row-sub">How your data is handled</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer-version">
+    Smart GST Tracker · Endless Digital World<br>
+    <strong style="color:var(--accent);">Version 1.8.2</strong>
+    <div style="font-size:10px;color:var(--muted);margin-top:4px;">© 2025 Endless Digital World</div>
+  </div>
+</div>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">💰</div>
+      <div class="logo-text">
+        <h1>Smart GST Tracker</h1>
+        <p>Endless Digital World · v1.8.2</p>
+      </div>
+    </div>
+    <button class="hamburger-btn" onclick="openDrawer()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active-income" id="tab-income"    onclick="switchTab('income')">💰 Income</button>
+    <button class="tab"               id="tab-expense"   onclick="switchTab('expense')">💸 Expense</button>
+  </div>
+
+  <!-- ═══ INCOME PANEL ═══ -->
+  <div id="panel-income">
+    <div class="card">
+      <div class="card-title"><span>💰</span> Record Income</div>
+      <div class="field">
+        <label>Month</label>
+        <div class="month-select-row"><select id="inc-month"></select></div>
+      </div>
+
+      <!-- Income Logging Mode -->
+      <div class="field">
+        <label>Log Income By</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px;">
+          <div class="period-option inc-mode-btn" id="mode-weekly" onclick="setIncomeMode('weekly')">📅 Weekly</div>
+          <div class="period-option inc-mode-btn" id="mode-monthly" onclick="setIncomeMode('monthly')">📆 Monthly</div>
+          <div class="period-option inc-mode-btn" id="mode-category" onclick="setIncomeMode('category')">🏷️ Category</div>
+        </div>
+      </div>
+
+      <!-- WEEKLY mode -->
+      <div id="inc-mode-weekly" style="display:none;">
+        <div class="field">
+          <label>Week Period</label>
+          <div class="period-grid" id="weekly-period-grid"></div>
+        </div>
+      </div>
+
+      <!-- MONTHLY mode -->
+      <div id="inc-mode-monthly" style="display:none;">
+        <div class="field">
+          <label>Period</label>
+          <div class="period-grid">
+            <div class="period-option" onclick="selectPeriod('Full Month')">Full Month</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CATEGORY mode -->
+      <div id="inc-mode-category" style="display:none;">
+        <div class="field">
+          <label>Income Category</label>
+          <div class="cat-grid-wrap">
+            <div class="cat-grid" id="inc-cat-grid"></div>
+            <button class="manage-cats-btn" onclick="openIncCatModal()">✏️ Manage income categories</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Amount Earned (incl. GST)</label>
+        <input type="number" id="inc-amount" placeholder="e.g. 150.00" min="0" step="0.01" oninput="updateGST()">
+      </div>
+      <div class="amount-row">
+        <div class="amount-pill pill-gst">
+          <div class="pill-label">GST Component (<span class="gst-rate-label">÷11</span>)</div>
+          <div class="pill-value" id="inc-gst-display">$0.00</div>
+        </div>
+        <div class="amount-pill pill-exgst">
+          <div class="pill-label">Your Income (ex-GST)</div>
+          <div class="pill-value" id="inc-exgst-display">$0.00</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Note (optional)</label>
+        <textarea id="inc-note" placeholder="e.g. Uber — Saturday night shift"></textarea>
+      </div>
+      <button class="submit-btn submit-income" onclick="submitIncome()">Add Income Entry ➔</button>
+    </div>
+  </div>
+
+  <!-- ═══ EXPENSE PANEL ═══ -->
+  <div id="panel-expense" style="display:none">
+    <div class="card">
+      <div class="card-title"><span>💸</span> Record Expense</div>
+      <div class="field">
+        <label>Month</label>
+        <select id="exp-month"></select>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <div class="cat-grid-wrap">
+          <div class="cat-grid" id="cat-grid"></div>
+          <button class="manage-cats-btn" onclick="openCatModal()">✏️ Manage categories</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Amount (incl. GST)</label>
+        <input type="number" id="exp-amount" placeholder="e.g. 80.00" min="0" step="0.01" oninput="updateExpGST()">
+      </div>
+      <div class="amount-row">
+        <div class="amount-pill pill-gst">
+          <div class="pill-label">GST Claimable (<span class="gst-rate-label">÷11</span>)</div>
+          <div class="pill-value" id="exp-gst-display">$0.00</div>
+        </div>
+        <div class="amount-pill pill-exgst">
+          <div class="pill-label">Cost (ex-GST)</div>
+          <div class="pill-value" id="exp-exgst-display">$0.00</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Note (optional)</label>
+        <textarea id="exp-note" placeholder="e.g. Shell Altona — full tank"></textarea>
+      </div>
+      <div class="field">
+        <label>Receipt (optional)</label>
+        <div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:14px 16px;text-align:center;cursor:pointer;transition:border-color 0.2s;" onclick="document.getElementById('receipt-file-input').click()" id="receipt-upload-zone">
+          <div style="font-size:22px;margin-bottom:4px;">📷</div>
+          <div style="font-size:12px;color:var(--muted);">Tap to scan or attach a receipt <span style="color:var(--accent);font-weight:600;">(optional)</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">Photo, PDF or image — saved to My Documents</div>
+        </div>
+        <input type="file" id="receipt-file-input" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="previewReceipt(event)">
+        <div id="receipt-preview" style="display:none;margin-top:10px;background:var(--card);border:1px solid var(--green);border-radius:10px;padding:10px 14px;display:none;align-items:center;gap:10px;">
+          <span style="font-size:20px;">📄</span>
+          <div style="flex:1;">
+            <div id="receipt-filename" style="font-size:12px;color:var(--green);font-weight:600;"></div>
+            <div style="font-size:11px;color:var(--muted);">Will be saved to My Documents</div>
+          </div>
+          <button onclick="clearReceipt()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>
+        </div>
+      </div>
+      <button class="submit-btn submit-expense" onclick="submitExpense()">Add Expense Entry ➔</button>
+    </div>
+  </div>
+
+  <!-- ═══ LOG PANEL ═══ -->
+  <div id="panel-log" style="display:none">
+    <div class="card">
+      <div class="card-title"><span>📋</span> Recent Entries
+        <span style="margin-left:auto;font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0;">(last 30)</span>
+      </div>
+      <div id="log-list"><div class="log-empty">No entries yet.</div></div>
+    </div>
+    <div class="card" style="margin-top:12px;">
+      <div class="card-title"><span>📊</span> Session Totals</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div class="amount-pill"><div class="pill-label">Income</div><div class="pill-value" id="sum-income" style="color:var(--green);font-size:16px;">$0.00</div></div>
+        <div class="amount-pill"><div class="pill-label">Expenses</div><div class="pill-value" id="sum-expense" style="color:var(--red);font-size:16px;">$0.00</div></div>
+        <div class="amount-pill"><div class="pill-label">GST Payable</div><div class="pill-value" id="sum-gst" style="color:var(--purple);font-size:16px;">$0.00</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PROGRESS PANEL ═══ -->
+  <div id="panel-progress" style="display:none">
+    <div class="card">
+      <div class="card-title"><span>🏆</span> My Progress</div>
+
+      <!-- Streak -->
+      <div class="streak-wrap" id="streak-wrap">
+        <div class="streak-icon">🔥</div>
+        <div>
+          <div class="streak-label">Active Months</div>
+          <div class="streak-val" id="streak-val">0</div>
+        </div>
+        <div style="margin-left:auto;text-align:right;">
+          <div style="font-size:11px;color:var(--muted);">Best Month Profit</div>
+          <div style="font-size:16px;font-weight:700;color:var(--green);" id="best-profit-disp">$0.00</div>
+        </div>
+      </div>
+
+      <!-- Stat grid -->
+      <div class="progress-stat-grid">
+        <div class="progress-stat">
+          <div class="ps-label">Total Income</div>
+          <div class="ps-val" id="prog-total-inc" style="color:var(--green);">$0.00</div>
+        </div>
+        <div class="progress-stat">
+          <div class="ps-label">Total Expenses</div>
+          <div class="ps-val" id="prog-total-exp" style="color:var(--red);">$0.00</div>
+        </div>
+        <div class="progress-stat">
+          <div class="ps-label">Net Profit</div>
+          <div class="ps-val" id="prog-net" style="color:var(--accent);">$0.00</div>
+        </div>
+        <div class="progress-stat">
+          <div class="ps-label">GST Payable</div>
+          <div class="ps-val" id="prog-gst" style="color:var(--purple);">$0.00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart card -->
+    <div class="card">
+      <div class="card-title"><span>📈</span> Monthly Chart</div>
+      <div class="progress-tabs">
+        <button class="progress-tab active" id="ptab-profit" onclick="switchChartView('profit')">Profit</button>
+        <button class="progress-tab" id="ptab-income" onclick="switchChartView('income')">Income</button>
+        <button class="progress-tab" id="ptab-expense" onclick="switchChartView('expense')">Expenses</button>
+        <button class="progress-tab" id="ptab-gst" onclick="switchChartView('gst')">GST</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="progress-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Rankings -->
+    <div class="card">
+      <div class="card-title"><span>🥇</span> Monthly Rankings — Best Profit</div>
+      <div id="rank-list"><div class="log-empty">No data yet — add some entries to see your rankings!</div></div>
+    </div>
+
+    <!-- Sync from Sheet card -->
+    <div class="card" id="sync-sheet-card">
+      <div class="card-title"><span>☁️</span> Sync from Google Sheet</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+        Pull all existing data from your Google Sheet to power the rankings, chart, and stats above. Any months with data in your sheet will be loaded into the app.
+      </div>
+      <button class="submit-btn" id="get-data-btn" onclick="fetchSheetData()" style="background:var(--purple);color:#fff;margin-top:0;">
+        ☁️ Get Data from Sheet
+      </button>
+      <div id="sync-status" style="display:none;margin-top:14px;"></div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<!-- ── WHAT'S NEW MODAL ── -->
+<div id="whats-new-modal">
+  <div class="whats-new-box">
+    <div class="whats-new-header">
+      <h2>✨ What's New</h2>
+      <button class="wn-close" onclick="closeWhatsNew()">✕</button>
+    </div>
+    <div id="wn-content"></div>
+    <div class="wn-clicks-left" id="wn-clicks-info"></div>
+  </div>
+</div>
+
+<!-- ── MY LOGS MODAL ── -->
+<div id="logs-modal">
+  <div class="logs-box">
+    <div class="logs-header">
+      <h2>📂 My Logs</h2>
+      <button class="logs-close" onclick="closeLogsModal()">✕</button>
+    </div>
+    <div class="logs-filter">
+      <select id="logs-month-filter">
+        <option value="all">All Months</option>
+      </select>
+      <select id="logs-type-filter">
+        <option value="all">All Types</option>
+        <option value="income">Income Only</option>
+        <option value="expense">Expenses Only</option>
+      </select>
+      <button onclick="exportLogsPDF()">📄 PDF</button>
+    </div>
+    <div class="logs-body" id="logs-body"></div>
+    <div style="padding:14px 16px;border-top:1px solid var(--border);">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:10px;">🗑️ Manage Data</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button onclick="confirmDeleteAll()" style="display:flex;align-items:center;gap:10px;background:var(--expense-bg);border:1px solid rgba(255,107,107,0.25);border-radius:10px;padding:11px 14px;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;text-align:left;">
+          <span style="font-size:16px;">🗑️</span>
+          <div>
+            <div>Delete App Data</div>
+            <div style="font-size:10px;color:var(--muted);font-weight:400;">Remove entries, categories & settings from this browser</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MANAGE INCOME CATEGORIES MODAL ── -->
+<div id="inc-cat-modal" class="generic-modal">
+  <div class="cat-modal-box">
+    <div class="cat-modal-header">
+      <h2>🏷️ Income Categories</h2>
+      <button class="cat-modal-close" onclick="closeIncCatModal()">✕</button>
+    </div>
+    <div class="cat-modal-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Create custom income sources (e.g. Uber, DoorDash, Freelance). You can log income under the same category multiple times.</div>
+      <div class="cat-add-row">
+        <input type="text" class="cat-add-input" id="new-inc-cat-input" placeholder="e.g. Uber, Side Job, Client A…" onkeydown="if(event.key==='Enter')addIncomeCategory()">
+        <button class="cat-add-btn" onclick="addIncomeCategory()">Add</button>
+      </div>
+      <div id="inc-cat-modal-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── EMAIL VERIFICATION MODAL ── -->
+<div id="email-verify-screen" style="position:fixed;inset:0;background:var(--bg);z-index:99996;display:none;align-items:center;justify-content:center;padding:24px;flex-direction:column;">
+  <div style="width:100%;max-width:400px;text-align:center;">
+
+    <!-- Step 1: Enter email -->
+    <div id="ev-step1">
+      <div style="font-size:52px;margin-bottom:12px;">📧</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--accent);margin-bottom:8px;">Verify Your Email</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6;">Enter your email address to receive your 6-digit verification code and get started.</div>
+      <input type="email" id="ev-email-input" placeholder="your@email.com" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:14px 16px;font-size:15px;font-family:'DM Sans',sans-serif;margin-bottom:12px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')sendVerificationOTP()">
+      <div id="ev-email-error" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:10px;"></div>
+      <button onclick="sendVerificationOTP()" style="width:100%;padding:16px;border-radius:12px;border:none;background:var(--accent);color:#0D1117;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;" id="ev-send-btn">Get My Code ➔</button>
+    </div>
+
+    <!-- Step 2: Show code on screen + entry boxes -->
+    <div id="ev-step2" style="display:none;">
+      <div style="font-size:52px;margin-bottom:12px;">🔐</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--accent);margin-bottom:8px;">Your Verification Code</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">Your one-time code for <strong style="color:var(--text);" id="ev-email-display"></strong> is:</div>
+
+      <!-- Large code display -->
+      <div id="ev-code-display" style="background:var(--card);border:2px solid var(--accent);border-radius:16px;padding:20px 16px;margin-bottom:20px;letter-spacing:0.3em;font-size:36px;font-weight:900;color:var(--accent);font-family:'DM Serif Display',serif;"></div>
+
+      <div style="font-size:12px;color:var(--muted);margin-bottom:20px;background:rgba(240,180,41,0.07);border:1px solid rgba(240,180,41,0.2);border-radius:10px;padding:10px 14px;line-height:1.6;">
+        ⏱️ This code expires in <strong id="ev-timer" style="color:var(--accent);">5:00</strong> — enter it below to continue.
+      </div>
+
+      <!-- Entry boxes -->
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;" id="ev-otp-boxes"></div>
+      <div id="ev-otp-error" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:10px;"></div>
+      <button onclick="verifyOTP()" style="width:100%;padding:16px;border-radius:12px;border:none;background:var(--accent);color:#0D1117;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;" id="ev-verify-btn">Verify & Continue ➔</button>
+      <div style="margin-top:14px;font-size:12px;color:var(--muted);">Need a new code? <span onclick="resendOTP()" style="color:var(--accent);cursor:pointer;text-decoration:underline;">Generate new code</span></div>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted);cursor:pointer;" onclick="backToEmail()">← Use a different email</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── MANAGE CATEGORIES MODAL ── -->
+<div id="cat-modal">
+  <div class="cat-modal-box">
+    <div class="cat-modal-header">
+      <h2>🗂️ Manage Categories</h2>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="rearrange-btn" onclick="toggleRearrangeMode()" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;">⇅ Rearrange</button>
+        <button class="cat-modal-close" onclick="closeCatModal()">✕</button>
+      </div>
+    </div>
+    <div class="cat-modal-body">
+      <div class="cat-add-row">
+        <input type="text" class="cat-add-input" id="new-cat-input" placeholder="Type a category name…" oninput="detectCatEmoji()" onkeydown="if(event.key==='Enter')addCategory()">
+        <button class="cat-add-btn" onclick="addCategory()">Add</button>
+      </div>
+      <div class="cat-detected" id="cat-detected-msg"></div>
+      <div id="cat-modal-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SETTINGS MODAL ── -->
+<div id="settings-modal" class="generic-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>⚙️ Settings</h2>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="modal-section-title">GST Rate</div>
+      <div style="margin-bottom:6px;font-size:12px;color:var(--muted);">Customize for your country (Australia = 10%)</div>
+      <div class="gst-rate-row">
+        <input type="number" class="gst-rate-input" id="gst-rate-input" min="1" max="50" step="0.1" placeholder="10">
+        <span style="font-size:16px;font-weight:700;color:var(--text);">%</span>
+        <button class="gst-rate-save" onclick="saveGstRate()">Save</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;" id="gst-rate-hint">Current GST rate: <strong id="gst-rate-current">10%</strong> — GST divisor: <strong id="gst-divisor-display">÷11</strong></div>
+
+      <hr class="divider">
+
+      <div class="modal-section-title">🔗 Google Sheet</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6;">Manage your connected Google Apps Script URL.</div>
+      <button class="settings-btn" onclick="closeSettings(); openModifySheetUrl();">🔗 Modify Google Sheet URL</button>
+
+      <hr class="divider">
+
+      <div class="modal-section-title">🔐 Security</div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Enable PIN Lock</div>
+          <div class="toggle-sub">Require PIN when opening app</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="pin-enabled-toggle" onchange="onPinToggle()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div id="pin-setup-section" style="display:none;margin-top:14px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="pin-setup-hint">Set a 4-digit PIN:</div>
+        <div class="pin-dots" id="setup-dots">
+          <div class="pin-dot" id="sd0"></div>
+          <div class="pin-dot" id="sd1"></div>
+          <div class="pin-dot" id="sd2"></div>
+          <div class="pin-dot" id="sd3"></div>
+        </div>
+        <div class="pin-pad" style="max-width:280px;margin:10px auto 0;">
+          <button class="pin-key" onclick="pinSetupKey('1')">1</button>
+          <button class="pin-key" onclick="pinSetupKey('2')">2</button>
+          <button class="pin-key" onclick="pinSetupKey('3')">3</button>
+          <button class="pin-key" onclick="pinSetupKey('4')">4</button>
+          <button class="pin-key" onclick="pinSetupKey('5')">5</button>
+          <button class="pin-key" onclick="pinSetupKey('6')">6</button>
+          <button class="pin-key" onclick="pinSetupKey('7')">7</button>
+          <button class="pin-key" onclick="pinSetupKey('8')">8</button>
+          <button class="pin-key" onclick="pinSetupKey('9')">9</button>
+          <button class="pin-key" onclick="pinSetupKey('0')">0</button>
+          <button class="pin-key del" onclick="pinSetupDel()">⌫</button>
+        </div>
+        <div class="pin-hint" id="pin-setup-msg"></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="modal-section-title">Data</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Data is stored locally in this browser for up to 7 years.</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;">To delete your data go to <strong style="color:var(--text);">☰ Menu → My Logs → Manage Data</strong>.</div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── PRIVACY MODAL ── -->
+<div id="privacy-modal" class="generic-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>🔒 Privacy Policy</h2>
+      <button class="modal-close" onclick="closePrivacy()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="privacy-badge">🛡️ 100% Local — Your data never leaves your device</div>
+      <p class="privacy-p"><strong style="color:var(--text);">Smart GST Tracker</strong> by Endless Digital World (EDW) is committed to your privacy.</p>
+      <p class="privacy-p"><strong style="color:var(--text);">What data is collected?</strong><br>
+      None. EDW does not collect, store, transmit, or have access to any data you enter into this app. Zero.</p>
+      <p class="privacy-p"><strong style="color:var(--text);">Where is my data stored?</strong><br>
+      All data entered in this app is stored locally in your browser (localStorage) on your device only. It is also shared directly with your own Smart GST Google Sheet via Google Apps Script — a connection you control.</p>
+      <p class="privacy-p"><strong style="color:var(--text);">Does EDW see my Google Sheet data?</strong><br>
+      No. The Google Apps Script runs inside your own Google account. EDW has no access to your sheet, your entries, or your financial information.</p>
+      <p class="privacy-p"><strong style="color:var(--text);">Third parties?</strong><br>
+      This app uses Google Fonts (DM Sans, DM Serif Display) for display purposes only. No analytics, no tracking scripts, no advertising SDKs are included.</p>
+      <p class="privacy-p"><strong style="color:var(--text);">Data deletion?</strong><br>
+      You can delete all locally stored data at any time via Settings → Delete All My Data in the menu.</p>
+      <p class="privacy-p" style="margin-top:16px;font-size:11px;">Smart GST Tracker v1.8.2 · Endless Digital World · For personal record-keeping only</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── RECONNECT SHEET MODAL ── -->
+<div id="reconnect-modal" class="generic-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>🔗 Change Sheet URL</h2>
+      <button class="modal-close" onclick="closeReconnectSheet()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+        Paste your Google Apps Script deployment URL below. You can find it in your Google Sheet under <strong style="color:var(--text);">Extensions → Apps Script → Deploy → Manage deployments</strong>.
+      </div>
+      <input type="text" id="reconnect-url-input" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 16px;font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:10px;" placeholder="https://script.google.com/macros/s/…/exec">
+      <div id="reconnect-error" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:10px;"></div>
+      <button class="setup-save-btn" onclick="saveReconnectUrl()">Save & Connect ➔</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODIFY SHEET URL MODAL ── -->
+<div id="modify-url-modal" class="generic-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>🔗 Modify Google Sheet URL</h2>
+      <button class="modal-close" onclick="closeModifySheetUrl()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section-title">Current URL</div>
+      <div id="modify-url-current" style="font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:16px;word-break:break-all;line-height:1.6;"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="settings-btn" onclick="closeModifySheetUrl(); openReconnectSheet();">🔗 Change URL</button>
+        <button class="settings-btn danger" onclick="confirmRemoveSheetUrl();">🗑️ Remove URL — Use app without Google Sheets</button>
+      </div>
+      <div id="modify-url-confirm" style="display:none;margin-top:16px;padding:16px;background:var(--expense-bg);border:1px solid rgba(255,107,107,0.3);border-radius:12px;">
+        <div style="font-size:13px;color:var(--red);font-weight:700;margin-bottom:8px;">⚠️ Remove Google Sheet connection?</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">Your local app data will be kept. You can reconnect a sheet at any time from Settings.</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="cancelRemoveSheetUrl()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+          <button onclick="executeRemoveSheetUrl()" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--red);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Yes, Remove</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HELP & SUPPORT MODAL ── -->
+<div id="help-modal" class="generic-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>🆘 Help & Support</h2>
+      <button class="modal-close" onclick="closeHelpModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align:center;padding:12px 0 20px;">
+        <div style="font-size:36px;margin-bottom:8px;">💬</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">We're here to help!</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">Got a question, issue or feedback? Send us an email and we'll get back to you within <strong style="color:var(--accent);">7 business days</strong>.</div>
+      </div>
+      <div class="modal-section-title">📖 Setup Guide</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6;">Download the complete 7-page setup guide covering all app features, Google Sheets integration, and how to get the most out of Smart GST Tracker.</div>
+        <button onclick="openSetupGuidePDF()" style="width:100%;padding:12px 16px;border-radius:10px;border:none;background:var(--accent);color:#0D1117;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <span>📄</span> View Setup Guide (PDF)
+        </button>
+      </div>
+      <div class="modal-section-title">Contact Us</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Email</div>
+        <div style="font-size:14px;color:var(--accent);font-weight:700;">endlessdigitalworld@gmail.com</div>
+      </div>
+      <div class="modal-section-title">Your Message</div>
+      <textarea id="help-subject" placeholder="Subject — e.g. Question about GST sync" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px 14px;font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:10px;resize:none;min-height:48px;"></textarea>
+      <textarea id="help-body" placeholder="Describe your question or issue…" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px 14px;font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:14px;resize:vertical;min-height:100px;"></textarea>
+      <button onclick="sendHelpEmail()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--accent);color:#0D1117;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;">✉️ Send Email</button>
+      <div style="margin-top:14px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--border);text-align:center;">
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;">We aim to respond to all enquiries within <strong style="color:var(--text);">7 business days</strong>.<br>Please include as much detail as possible so we can help you quickly.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── REWARDS MODAL ── -->
+<div id="rewards-modal" class="generic-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>🏅 Rewards & Points</h2>
+      <button class="modal-close" onclick="closeRewardsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align:center;padding:8px 0 20px;">
+        <div style="font-size:48px;margin-bottom:8px;">⭐</div>
+        <div style="font-size:28px;font-weight:700;color:var(--accent);" id="rewards-points-display">0</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Total Points Earned</div>
+      </div>
+      <div class="modal-section-title">How to Earn Points</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;color:var(--text);">Income over $1</div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent);">+5 pts</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;color:var(--text);">Income over $50</div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent);">+15 pts</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;color:var(--text);">Income over $100</div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent);">+500 pts</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;color:var(--text);">Income over $1,000</div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent);">+2,000 pts</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;color:var(--text);">Income over $2,000</div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent);">+5,000 pts</div>
+        </div>
+      </div>
+      <div class="modal-section-title">Share Your Score</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Proud of your score? Share it with friends on social media!</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button onclick="sharePoints('instagram')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;border-radius:12px;border:none;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;">
+          <span style="font-size:20px;">📸</span> Share to Instagram Story
+        </button>
+        <button onclick="sharePoints('copy')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;">
+          <span style="font-size:20px;">📋</span> Copy Score to Share
+        </button>
+        <button onclick="sharePoints('native')" style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;">
+          <span style="font-size:20px;">📤</span> Share via…
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MY DOCUMENTS MODAL ── -->
+<div id="my-documents-modal" class="generic-modal">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-header">
+      <h2>📁 My Documents</h2>
+      <button class="modal-close" onclick="closeMyDocuments()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);">
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">Receipts you attach when logging expenses are saved here as PDF or image files, accessible anytime.</div>
+      </div>
+      <div id="my-documents-body" style="padding:0 20px;max-height:60vh;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONFIRM DELETE MODAL ── -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-icon">⚠️</div>
+    <div class="confirm-title">Delete Data</div>
+    <div class="confirm-msg">Choose what you want to permanently delete. <strong style="color:var(--red);">This cannot be reversed.</strong></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0;">
+      <label style="display:flex;align-items:flex-start;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;">
+        <input type="checkbox" id="del-app-data" checked style="margin-top:2px;accent-color:var(--red);">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">App Data</div>
+          <div style="font-size:11px;color:var(--muted);">All local entries, categories & settings stored in this browser</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;">
+        <input type="checkbox" id="del-sheet-data" style="margin-top:2px;accent-color:var(--red);">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">Google Sheet Data</div>
+          <div style="font-size:11px;color:var(--muted);">Clears all entries from your connected Google Sheet (cannot be undone)</div>
+        </div>
+      </label>
+    </div>
+    <div id="confirm-delete-warning" style="font-size:11px;color:var(--red);margin-bottom:12px;display:none;">⚠️ Deleting Google Sheet data is permanent and cannot be recovered.</div>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="confirm-delete" onclick="executeDeleteAll()">Yes, Delete Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ABOUT APP MODAL ── -->
+<div id="about-modal" class="generic-modal">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <h2>ℹ️ About This App</h2>
+      <button class="modal-close" onclick="closeAboutApp()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div style="text-align:center;padding:16px 0 20px;">
+        <div style="font-size:36px;margin-bottom:6px;">💰</div>
+        <div style="font-size:17px;font-weight:700;color:var(--accent);">Smart GST Tracker</div>
+        <div style="font-size:12px;color:var(--muted);">by Endless Digital World · Version 1.8.1</div>
+      </div>
+
+      <div class="modal-section-title">📱 Web App Features</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">💰 Income & Expense Tracking</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Record income and expenses with GST automatically split out at 10%. Supports up to 10 income entries per month and unlimited expense categories.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">☁️ Google Sheets Sync</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Every entry syncs instantly to your own private Google Sheet. Your data stays in your Google account — EDW never sees it.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">🏆 Gamified Progress</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Monthly profit rankings with 🥇🥈🥉 medals, income vs expense charts, GST payable trends, and performance stats to keep you motivated.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">📂 My Logs</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Browse all entries by month and type. Export a PDF report for any period. Manage and delete data securely from here.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">🔒 PIN Lock</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Set a 4-digit PIN to protect your financial data. Enable it under Settings.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">🗂️ Custom Categories</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Add your own expense categories beyond the defaults. Manage them anytime via Manage Categories in the menu.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">🔄 Auto Updates</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">The app is hosted online. New features and improvements are delivered automatically every time you open it — no re-download needed.</div>
+        </div>
+      </div>
+
+      <div class="modal-section-title">📊 Google Sheet Features</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">📅 12 Monthly Sheets</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">One tab per month (January–December). Each sheet tracks income entries, expense categories, GST amounts, and ex-GST totals.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">📈 Dashboard Overview</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">The Dashboard tab shows a full financial year overview — income, expenses, net profit and GST payable for every month at a glance.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">📋 Quarterly ATO Breakdown</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Quarterly totals aligned to ATO BAS periods (Q1–Q4) with GST payable per quarter — makes BAS lodgement much easier.</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:11px 14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">⚡ Apps Script Integration</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">The built-in Apps Script connects the sheet to this app. It handles writing new entries and reading back data for the sync feature.</div>
+        </div>
+      </div>
+
+      <div class="modal-section-title">💡 Tips</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:6px;">
+        • Always enter amounts <strong style="color:var(--text);">including GST</strong> — the app splits it out automatically.<br>
+        • Use the <strong style="color:var(--text);">Get Data from Sheet</strong> button in the Progress tab to sync existing sheet data.<br>
+        • Bookmark this app in your browser so you can open it instantly anytime.<br>
+        • Export a PDF from My Logs at the end of each quarter for your records.<br>
+        • The GST rate can be changed in Settings if it ever changes from 10%.
+      </div>
+
+      <div style="margin-top:16px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--border);text-align:center;">
+        <div style="font-size:11px;color:var(--muted);">Questions or feedback?</div>
+        <div style="font-size:12px;color:var(--accent);font-weight:600;margin-top:4px;">endlessdigitalworld@gmail.com</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── PRIVATE BROWSER WARNING MODAL ── -->
+<div id="private-browser-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;max-width:400px;width:100%;padding:28px 24px;text-align:center;">
+    <div style="font-size:36px;margin-bottom:12px;">🔒</div>
+    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:10px;">Using a Private Browser?</div>
+    <div style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:18px;">
+      Please <strong style="color:var(--red);">don't use a private or incognito browser</strong> — it may not save your data in the app or sync properly to Google Sheets.<br><br>
+      If you're currently in private mode, please switch to a <strong style="color:var(--green);">normal browser window</strong> and log back in to keep your data safe.
+    </div>
+    <button onclick="acknowledgePrivateBrowser()" style="background:var(--accent);color:#0D1117;font-weight:700;border:none;border-radius:12px;padding:14px 28px;font-size:14px;cursor:pointer;width:100%;">
+      ✓ I Understand — Continue
+    </button>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────
+const APP_VERSION = '1.8.2';
+const APP_STORAGE_LIMIT = 50000; // ~7 years of daily entries
+const MONTHS = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+
+const SHEET_URL_KEY = 'edw_sheet_url';
+function getSheetUrl() { return localStorage.getItem(SHEET_URL_KEY) || ''; }
+
+const DEFAULT_CATS = [
+  {name:"Business Purchase", icon:"🛒", isDefault:true},
+  {name:"Fuel",              icon:"⛽", isDefault:true},
+  {name:"Insurance",         icon:"🛡️", isDefault:true},
+  {name:"Servicing",         icon:"🔧", isDefault:true},
+  {name:"Car Wash",          icon:"🚿", isDefault:true},
+  {name:"Amenities",         icon:"🎁", isDefault:true},
+  {name:"Phone Bill",        icon:"📱", isDefault:true},
+  {name:"Registration",      icon:"📄", isDefault:true},
+  {name:"Tolls",             icon:"🛣️", isDefault:true},
+];
+
+const EMOJI_MAP = [
+  {keys:['fuel','petrol','gas','diesel','bp','shell','caltex'], emoji:'⛽'},
+  {keys:['insurance','insure','cover','policy'], emoji:'🛡️'},
+  {keys:['service','servic','mechanic','repair','oil','tyre','tire'], emoji:'🔧'},
+  {keys:['wash','clean','detail','valet'], emoji:'🚿'},
+  {keys:['phone','mobile','telstra','optus','vodafone','data','sim'], emoji:'📱'},
+  {keys:['toll','citylink','eastlink','linkt','etag'], emoji:'🛣️'},
+  {keys:['register','rego','registration','vicroad'], emoji:'📄'},
+  {keys:['ameniti','snack','water','refresh','supply','supplies'], emoji:'🎁'},
+  {keys:['park','parking'], emoji:'🅿️'},
+  {keys:['food','meal','lunch','dinner','coffee','cafe','eat','restaur'], emoji:'🍽️'},
+  {keys:['uber','didi','ola','lyft','rideshare','platform','app fee'], emoji:'🚗'},
+  {keys:['rent','lease','hire'], emoji:'🏠'},
+  {keys:['tax','ato','bas','gst','account'], emoji:'📊'},
+  {keys:['laptop','computer','software','tech','device','equip'], emoji:'💻'},
+  {keys:['market','advertis','promo','social media','flyer'], emoji:'📣'},
+  {keys:['medical','health','doctor','hospital','pharmacy','chemist'], emoji:'🏥'},
+  {keys:['train','bus','transit','public transport','ptv'], emoji:'🚌'},
+  {keys:['electric','power','energy','ev','charge'], emoji:'⚡'},
+  {keys:['purchase','buy','shop','store','retail'], emoji:'🛒'},
+  {keys:['subscript','netflix','spotify','amazon'], emoji:'📺'},
+  {keys:['credit','card','visa','mastercard','amex'], emoji:'💳'},
+];
+
+const WHATS_NEW = [
+  {
+    version: '1.8.2',
+    items: [
+      'Custom income categories — create unlimited income sources (e.g. Uber, DoorDash, side jobs) accessible from the Income screen',
+      'Smart period selection — log income by Month, by Week (Week 1–4 with correct dates per month), or by Category',
+      'App version now shown on the loading screen, in the header, and at the bottom of the hamburger menu',
+      'Notes now sync to Google Sheets — descriptions added to income and expense entries appear as a dedicated Notes column in your sheet',
+      'Email verification — new users verify their email address with a 6-digit OTP before using the app',
+    ]
+  },
+  {
+    version: '1.8.1',
+    items: [
+      'Rewards program updated',
+      'Receipt scanning — optionally attach a receipt when logging expenses (saved as PDF under My Logs → My Documents)',
+      'Permanent local profile — your name and data are remembered for up to 7 years, even after clearing browser history',
+      'Setup Guide PDF added in Help & Support',
+      'App version now shown at the bottom of the hamburger menu',
+    ]
+  },
+  {
+    version: '1.8',
+    items: [
+      'Rewards & Points — earn points every time you log income',
+      'Share your points score on Instagram Stories and social media with friends',
+      'Rearrange expense categories — dedicated button in Manage Categories (drag & drop reorder mode)',
+      'App version now shown on the loading/splash screen',
+      'Help & Support — email Endless Digital World directly from the app, response within 7 business days',
+      'Google Sheet URL now tucked away in Settings → Modify Google Sheet URL (view or change)',
+      'Remove Google Sheet URL — continue using the app without a sheet connection',
+      'Biometric login option removed for a cleaner, simpler experience',
+      'All version update history permanently stored under What\'s New → Previous Versions',
+    ]
+  },
+  {
+    version: '1.7',
+    items: [
+      'Drag to reorder expense categories — hold and drag the ☰ handle',
+      'Private browser warning — shown every 6 hours to protect your data',
+      'Biometric login — enable Face ID / Touch ID / Fingerprint in Settings',
+      'Change Sheet URL moved into Settings for a cleaner menu',
+      'Settings now shows your current connected sheet URL',
+      'Security section consolidated — PIN and biometrics in one place',
+    ]
+  },
+  {
+    version: '1.6',
+    items: [
+      'Storage upgraded to 7 years of data (up from 365 days)',
+      'Delete data moved to My Logs → Manage Data — with option to also clear Google Sheet',
+      'About This App — full feature guide accessible from the menu anytime',
+      'What\'s New cycles to Release Notes after 3 views, resets on next update',
+      'All version history permanently stored and visible in Release Notes',
+      'Version number shown on loading screen, header and bottom of menu',
+    ]
+  },
+  {
+    version: '1.5',
+    items: [
+      'Etsy release — now available for everyone to purchase!',
+      'Redesigned welcome screen with feature highlights & setup guide',
+      'Customer-friendly error messages and support contact info',
+      'Each customer connects their own Google Sheet — full data privacy',
+      'All future updates delivered automatically — no re-download needed',
+    ]
+  },
+  {
+    version: '1.4',
+    items: [
+      'Get Data from Sheet — pull all existing Google Sheet data into the app',
+      'Sheet sync powers the rankings, chart & stats with your real historical data',
+      'Parallel fetch across all 12 months for instant sync',
+      'Imported data merges cleanly — no duplicates on re-sync',
+      'Sync status panel shows month-by-month income, expense & GST breakdown',
+    ]
+  },
+  {
+    version: '1.2',
+    items: [
+      'Custom expense categories — add your own with auto emoji detection',
+      'Hamburger menu with connection status, app version and quick links',
+      'My Logs — view all entries by month and export to PDF',
+      'What\'s New — always see what\'s been updated in each version',
+      'Splash screen on launch with EDW branding',
+      'App rebranded: Smart GST Tracker by Endless Digital World',
+    ]
+  },
+  {
+    version: '1.3',
+    items: [
+      'My Progress — gamified monthly rankings, charts & stats',
+      'Best month ranking with 🥇🥈🥉 medals based on profit',
+      'Interactive monthly charts: Profit, Income, Expenses, GST',
+      '365-day local data storage — your data is always safe',
+      '4-digit PIN lock — optional app protection on launch',
+      'Settings — customize GST rate (for any country) + PIN management',
+      'Custom GST rate syncs to Google Sheet automatically',
+      'Privacy Policy — full transparency on data handling',
+      'Delete All Data — wipe everything with confirmation prompt',
+      'New categories sync to Google Sheet with auto-calculator formulas',
+      'Deleted categories also removed from Google Sheet',
+    ]
+  }
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let selectedPeriod = null;
+let selectedCat    = null;
+
+// Load entries & prune entries older than 365 days
+function loadEntries() {
+  const raw = JSON.parse(localStorage.getItem('gst_entries') || '[]');
+  const cutoff = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  return raw.filter(e => new Date(e.ts).getTime() > cutoff);
+}
+let entries    = loadEntries();
+let categories = JSON.parse(localStorage.getItem('gst_categories') || 'null') || DEFAULT_CATS.map(c=>({...c}));
+
+// ── GST RATE ──────────────────────────────────────────────────────────────
+function getGstRate() {
+  return parseFloat(localStorage.getItem('gst_rate') || '10');
+}
+function getGstDivisor() {
+  const rate = getGstRate();
+  return (100 + rate) / rate;   // e.g. 10% → 11, 15% → 7.667
+}
+function calcGst(amount) {
+  return amount / getGstDivisor();
+}
+function updateGstLabels() {
+  const rate = getGstRate();
+  const div  = getGstDivisor().toFixed(3).replace(/\.?0+$/, '');
+  document.querySelectorAll('.gst-rate-label').forEach(el => el.textContent = `÷${div}`);
+  document.getElementById('gst-rate-current').textContent   = `${rate}%`;
+  document.getElementById('gst-divisor-display').textContent = `÷${div}`;
+  document.getElementById('gst-rate-input').value = rate;
+}
+
+// ── PIN STATE ─────────────────────────────────────────────────────────────
+let pinSetupBuffer = '';
+let pinLockBuffer  = '';
+let pinSetupPhase  = 'set'; // 'set' | 'confirm'
+let pinSetupTemp   = '';
+
+function getPinEnabled() { return localStorage.getItem('pin_enabled') === 'true'; }
+function getPin()        { return localStorage.getItem('pin_hash') || ''; }
+function hashPin(pin)    { // simple reversible for localStorage (not crypto — UI only)
+  return btoa(pin + '_edw_gst');
+}
+
+// ── PERMANENT PROFILE (IndexedDB — survives browser history clear) ────────
+const EDW_DB_NAME = 'edw_smart_gst';
+const EDW_DB_VERSION = 1;
+const EDW_STORE = 'profile';
+
+function openProfileDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(EDW_DB_NAME, EDW_DB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(EDW_STORE)) {
+        db.createObjectStore(EDW_STORE, { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function saveProfileData(key, value) {
+  try {
+    const db = await openProfileDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(EDW_STORE, 'readwrite');
+      tx.objectStore(EDW_STORE).put({ key, value, ts: Date.now() });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch(e) { console.warn('ProfileDB save failed', e); }
+}
+
+async function getProfileData(key) {
+  try {
+    const db = await openProfileDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(EDW_STORE, 'readonly');
+      const req = tx.objectStore(EDW_STORE).get(key);
+      req.onsuccess = () => resolve(req.result ? req.result.value : null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch(e) { return null; }
+}
+
+// 7 years in ms
+const PROFILE_TTL = 7 * 365 * 24 * 60 * 60 * 1000;
+
+async function getProfileName() {
+  // Check IndexedDB first (survives browser history clear)
+  let name = await getProfileData('user_name');
+  if (name) {
+    // Also restore to localStorage for other lookups
+    localStorage.setItem('edw_user_name', name);
+    return name;
+  }
+  // Fallback to localStorage
+  return localStorage.getItem('edw_user_name') || null;
+}
+
+async function saveProfileName(name) {
+  await saveProfileData('user_name', name);
+  localStorage.setItem('edw_user_name', name);
+  // Silently send name + email to EDW once — only on first save
+  if (!localStorage.getItem('edw_user_registered')) {
+    const email = localStorage.getItem('edw_verified_email') || '';
+    if (email) {
+      silentlyRegisterUser(name, email);
+      localStorage.setItem('edw_user_registered', 'true');
+    }
+  }
+}
+
+async function restoreProfileFromDB() {
+  // Restore entries from IndexedDB if localStorage was cleared
+  if (!localStorage.getItem('gst_entries') || localStorage.getItem('gst_entries') === '[]') {
+    const saved = await getProfileData('gst_entries_backup');
+    if (saved) {
+      localStorage.setItem('gst_entries', saved);
+      entries = JSON.parse(saved);
+      renderLog(); updateTotals();
+    }
+  }
+  // Restore categories
+  if (!localStorage.getItem('gst_categories')) {
+    const savedCats = await getProfileData('gst_categories_backup');
+    if (savedCats) {
+      localStorage.setItem('gst_categories', savedCats);
+      categories = JSON.parse(savedCats);
+      buildCatGrid();
+    }
+  }
+  // Restore sheet URL
+  if (!localStorage.getItem(SHEET_URL_KEY)) {
+    const savedUrl = await getProfileData('sheet_url_backup');
+    if (savedUrl) localStorage.setItem(SHEET_URL_KEY, savedUrl);
+  }
+  // Restore points
+  if (!localStorage.getItem('edw_points')) {
+    const savedPts = await getProfileData('edw_points_backup');
+    if (savedPts) localStorage.setItem('edw_points', savedPts);
+  }
+}
+
+// Sync critical data to IndexedDB on every save
+function backupToProfileDB() {
+  saveProfileData('gst_entries_backup', localStorage.getItem('gst_entries') || '[]');
+  saveProfileData('gst_categories_backup', localStorage.getItem('gst_categories') || 'null');
+  saveProfileData('sheet_url_backup', localStorage.getItem(SHEET_URL_KEY) || '');
+  saveProfileData('edw_points_backup', localStorage.getItem('edw_points') || '0');
+}
+
+// ── NAME PROMPT MODAL ─────────────────────────────────────────────────────
+function showNamePrompt(onComplete) {
+  // Create a simple name entry overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'name-prompt-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99998;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:32px 24px;width:100%;max-width:380px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">👋</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--accent);margin-bottom:6px;">Welcome to Smart GST Tracker</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6;">Enter your name to set up your personal profile. Your data will be remembered for up to 7 years.</div>
+      <input type="text" id="name-prompt-input" placeholder="Your first name…" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:14px 16px;font-size:15px;font-family:'DM Sans',sans-serif;margin-bottom:16px;box-sizing:border-box;">
+      <div id="name-prompt-error" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:10px;"></div>
+      <button id="name-prompt-btn" style="width:100%;padding:16px;border-radius:12px;border:none;background:var(--accent);color:#0D1117;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;">Get Started ➔</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const input = overlay.querySelector('#name-prompt-input');
+  const btn   = overlay.querySelector('#name-prompt-btn');
+  const err   = overlay.querySelector('#name-prompt-error');
+  input.focus();
+  const submit = async () => {
+    const val = input.value.trim();
+    if (!val) { err.textContent = 'Please enter your name.'; return; }
+    await saveProfileName(val);
+    overlay.remove();
+    onComplete(val);
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+}
+
+// ── RETURNING USER NAME PROMPT (browser history deleted) ──────────────────
+function showReturningNamePrompt(onComplete) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99998;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:32px 24px;width:100%;max-width:380px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">🔄</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--accent);margin-bottom:6px;">Welcome Back!</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6;">It looks like your browser history was cleared. Enter your name to restore your profile and data.</div>
+      <input type="text" id="returning-name-input" placeholder="Your name…" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:14px 16px;font-size:15px;font-family:'DM Sans',sans-serif;margin-bottom:16px;box-sizing:border-box;">
+      <div id="returning-name-error" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:10px;"></div>
+      <button id="returning-name-btn" style="width:100%;padding:16px;border-radius:12px;border:none;background:var(--accent);color:#0D1117;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;">Restore My Data ➔</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const input = overlay.querySelector('#returning-name-input');
+  const btn   = overlay.querySelector('#returning-name-btn');
+  const err   = overlay.querySelector('#returning-name-error');
+  input.focus();
+  const submit = async () => {
+    const val = input.value.trim();
+    if (!val) { err.textContent = 'Please enter your name.'; return; }
+    // Save name back to both stores
+    await saveProfileName(val);
+    overlay.remove();
+    onComplete(val);
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+}
+
+function showSetupScreen() {
+  document.getElementById('setup-screen').classList.add('active');
+}
+function hideSetupScreen() {
+  document.getElementById('setup-screen').classList.remove('active');
+}
+
+function saveSetupUrl() {
+  const val = document.getElementById('setup-url-input').value.trim();
+  const err = document.getElementById('setup-error');
+  if (!val) { err.textContent = 'Please paste your Apps Script URL.'; return; }
+  if (!val.startsWith('https://script.google.com/macros/s/')) {
+    err.textContent = 'That doesn\'t look like a valid Apps Script URL. Please check and try again.';
+    return;
+  }
+  localStorage.setItem(SHEET_URL_KEY, val);
+  err.textContent = '';
+  hideSetupScreen();
+  updateConnectionStatus();
+  toast('✅ Sheet connected successfully!', 'success');
+}
+
+function skipSetup() {
+  localStorage.setItem(SHEET_URL_KEY, 'skipped');
+  hideSetupScreen();
+  updateConnectionStatus();
+}
+
+function openReconnectSheet() {
+  const current = getSheetUrl();
+  document.getElementById('reconnect-url-input').value = current === 'skipped' ? '' : current;
+  document.getElementById('reconnect-error').textContent = '';
+  document.getElementById('reconnect-modal').classList.add('open');
+}
+function closeReconnectSheet() {
+  document.getElementById('reconnect-modal').classList.remove('open');
+}
+function saveReconnectUrl() {
+  const val = document.getElementById('reconnect-url-input').value.trim();
+  const err = document.getElementById('reconnect-error');
+  if (!val) { err.textContent = 'Please paste your Apps Script URL.'; return; }
+  if (!val.startsWith('https://script.google.com/macros/s/')) {
+    err.textContent = 'That doesn\'t look like a valid Apps Script URL.';
+    return;
+  }
+  localStorage.setItem(SHEET_URL_KEY, val);
+  closeReconnectSheet();
+  updateConnectionStatus();
+  toast('✅ Sheet URL updated!', 'success');
+}
+
+function updateConnectionStatus() {
+  const url = getSheetUrl();
+  const connected = url && url !== 'skipped';
+  const dot  = document.getElementById('drawer-dot');
+  const text = document.getElementById('drawer-conn-text');
+  const sub  = document.getElementById('drawer-sheet-sub');
+  if (dot)  dot.className  = 'dot ' + (connected ? 'green' : 'red');
+  if (text) text.textContent = connected ? 'Sheet connected' : 'No sheet connected';
+  if (sub)  sub.textContent  = connected ? 'Connected — tap to change URL' : 'Not connected — tap to set up';
+}
+
+// ── SPLASH & INIT ─────────────────────────────────────────────────────────
+setTimeout(async () => {
+  const splash = document.getElementById('splash');
+  if (splash) splash.style.display = 'none';
+
+  // Restore data from IndexedDB in case localStorage was cleared
+  await restoreProfileFromDB();
+
+  const url = getSheetUrl();
+  const profileName = await getProfileName();
+  const lsName = localStorage.getItem('edw_user_name');
+
+  if (!profileName) {
+    // Completely new user — email verify first, then name prompt, then setup
+    const emailVerified = localStorage.getItem('edw_email_verified') === 'true';
+    if (!emailVerified) {
+      showEmailVerify(() => {
+        showNamePrompt(async (name) => {
+          updateDrawerProfile(name);
+          if (!url) showSetupScreen();
+          else updateConnectionStatus();
+        });
+      });
+    } else {
+      showNamePrompt(async (name) => {
+        updateDrawerProfile(name);
+        if (!url) showSetupScreen();
+        else updateConnectionStatus();
+      });
+    }
+  } else if (!lsName && profileName) {
+    // Has IndexedDB profile but localStorage was cleared (browser history delete)
+    showReturningNamePrompt(async (name) => {
+      updateDrawerProfile(name);
+      await restoreProfileFromDB();
+      renderLog(); updateTotals(); updateDrawerPointsSub();
+      updateConnectionStatus();
+      if (!getSheetUrl()) showSetupScreen();
+    });
+  } else {
+    // Normal returning user
+    updateDrawerProfile(profileName);
+    if (!url) showSetupScreen();
+    else if (getPinEnabled() && getPin()) {
+      document.getElementById('pin-lock').classList.add('active');
+    }
+    updateConnectionStatus();
+  }
+
+  // Backup to IndexedDB on every load
+  backupToProfileDB();
+}, 2700);
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Month dropdowns
+  ['inc-month','exp-month','logs-month-filter'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const now = new Date();
+    if (id === 'logs-month-filter') {
+      MONTHS.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        sel.appendChild(opt);
+      });
+    } else {
+      MONTHS.forEach((m, i) => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        if (i === now.getMonth()) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+  });
+
+  buildCatGrid();
+  renderLog();
+  updateTotals();
+  updateWhatsNewBadge();
+  updateGstLabels();
+  updateConnectionStatus();
+  updateDrawerPointsSub();
+  localStorage.setItem('gst_entries', JSON.stringify(entries));
+
+  // Private browser warning (every 6 hours)
+  setTimeout(checkPrivateBrowser, 1500);
+});
+
+function updateDrawerProfile(name) {
+  const el = document.getElementById('drawer-profile-name');
+  if (el && name) el.textContent = '👤 ' + name;
+}
+
+// ── DRAWER ────────────────────────────────────────────────────────────────
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['income','expense','log','progress'].forEach(t => {
+    const panel = document.getElementById('panel-'+t);
+    if (panel) panel.style.display = t===tab ? '' : 'none';
+    const btn = document.getElementById('tab-'+t);
+    if (btn) {
+      btn.className = 'tab';
+      if (t===tab) {
+        if (t==='income')        btn.className += ' active-income';
+        else if (t==='expense')  btn.className += ' active-expense';
+        else if (t==='progress') btn.className += ' active-progress';
+        else                     btn.className += ' active-logs';
+      }
+    }
+  });
+  if (tab === 'progress') renderProgress();
+}
+
+// ── PERIOD ────────────────────────────────────────────────────────────────
+function selectPeriod(p) {
+  selectedPeriod = p;
+  document.querySelectorAll('.period-option').forEach(el => {
+    el.classList.remove('selected-income');
+    if (el.textContent.trim() === p) el.classList.add('selected-income');
+  });
+}
+
+// ── CATEGORY SELECT ───────────────────────────────────────────────────────
+function selectCat(cat) {
+  selectedCat = cat;
+  document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected'));
+  const safe = cat.replace(/[^a-zA-Z0-9]/g,'_');
+  const el = document.getElementById('cat-'+safe);
+  if (el) el.classList.add('selected');
+}
+
+// ── BUILD CATEGORY GRID ───────────────────────────────────────────────────
+function buildCatGrid() {
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = '';
+  selectedCat = null;
+  categories.forEach(cat => {
+    const btn = document.createElement('div');
+    btn.className = 'cat-btn';
+    btn.id = 'cat-' + cat.name.replace(/[^a-zA-Z0-9]/g,'_');
+    btn.innerHTML = `<span class="cat-icon">${cat.icon}</span>${cat.name}`;
+    btn.onclick = () => selectCat(cat.name);
+    grid.appendChild(btn);
+  });
+}
+
+// ── GST CALC ──────────────────────────────────────────────────────────────
+function updateGST() {
+  const amt = parseFloat(document.getElementById('inc-amount').value) || 0;
+  document.getElementById('inc-gst-display').textContent   = fmt(calcGst(amt));
+  document.getElementById('inc-exgst-display').textContent = fmt(amt - calcGst(amt));
+}
+function updateExpGST() {
+  const amt = parseFloat(document.getElementById('exp-amount').value) || 0;
+  document.getElementById('exp-gst-display').textContent   = fmt(calcGst(amt));
+  document.getElementById('exp-exgst-display').textContent = fmt(amt - calcGst(amt));
+}
+function fmt(n) { return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+// ── PUSH TO SHEET ─────────────────────────────────────────────────────────
+async function pushToSheet(entry) {
+  const url = getSheetUrl();
+  if (!url || url === 'skipped') { toast('✅ Saved locally!', 'success'); return; }
+  const params = new URLSearchParams({
+    type: entry.type, month: entry.month, amount: entry.amount,
+    note: entry.note||'', period: entry.period||'', category: entry.category||'',
+    gstRate: getGstRate()
+  });
+  try {
+    await fetch(getSheetUrl() + '?' + params.toString(), {method:'GET', mode:'no-cors'});
+    toast('✅ Saved & synced to Google Sheets!', 'success');
+  } catch {
+    toast('Saved locally — sync failed.', 'info');
+  }
+}
+
+// ── PUSH CATEGORY TO SHEET ────────────────────────────────────────────────
+async function pushCategoryToSheet(action, catName, catIcon) {
+  const params = new URLSearchParams({
+    action: action === 'add' ? 'addCategory' : 'deleteCategory',
+    category: catName,
+    icon: catIcon || '',
+    gstRate: getGstRate()
+  });
+  try {
+    await fetch(getSheetUrl() + '?' + params.toString(), {method:'GET', mode:'no-cors'});
+  } catch { /* silent */ }
+}
+
+// ── PUSH GST RATE TO SHEET ────────────────────────────────────────────────
+async function pushGstRateToSheet(rate) {
+  const params = new URLSearchParams({ action: 'setGstRate', gstRate: rate });
+  try {
+    await fetch(getSheetUrl() + '?' + params.toString(), {method:'GET', mode:'no-cors'});
+  } catch { /* silent */ }
+}
+
+// ── SUBMIT INCOME ─────────────────────────────────────────────────────────
+async function submitIncome() {
+  const month  = document.getElementById('inc-month').value;
+  const amount = parseFloat(document.getElementById('inc-amount').value);
+  const note   = document.getElementById('inc-note').value.trim();
+
+  // Mode validation
+  if (!incomeMode) return toast('Please select how to log income (Weekly, Monthly, or Category).', 'error');
+  if (incomeMode === 'category' && !selectedIncCat) return toast('Please select an income category.', 'error');
+  if ((incomeMode === 'weekly' || incomeMode === 'monthly') && !selectedPeriod) return toast('Please select a period.', 'error');
+  if (!amount || amount <= 0) return toast('Please enter a valid amount.', 'error');
+
+  const btn = document.querySelector('.submit-income');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const periodLabel = incomeMode === 'category' ? selectedIncCat : selectedPeriod;
+  const entry = {type:'income', month, period:periodLabel, amount, note, gst:calcGst(amount), ts:new Date().toISOString()};
+  entries.unshift(entry);
+  localStorage.setItem('gst_entries', JSON.stringify(entries.slice(0,APP_STORAGE_LIMIT)));
+  backupToProfileDB();
+  awardPoints(amount);
+  await pushToSheet(entry);
+
+  document.getElementById('inc-amount').value = '';
+  document.getElementById('inc-note').value = '';
+  selectedPeriod = null;
+  selectedIncCat = null;
+  document.querySelectorAll('.period-option').forEach(el => el.classList.remove('selected-income'));
+  document.querySelectorAll('#inc-cat-grid .cat-btn').forEach(el => el.classList.remove('selected'));
+  updateGST(); renderLog(); updateTotals();
+  btn.disabled = false; btn.textContent = 'Add Income Entry ➔';
+}
+
+// ── SUBMIT EXPENSE ────────────────────────────────────────────────────────
+async function submitExpense() {
+  const month  = document.getElementById('exp-month').value;
+  const amount = parseFloat(document.getElementById('exp-amount').value);
+  const note   = document.getElementById('exp-note').value.trim();
+  if (!selectedCat)         return toast('Please select a category.', 'error');
+  if (!amount || amount<=0) return toast('Please enter a valid amount.', 'error');
+
+  const btn = document.querySelector('.submit-expense');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const entry = {type:'expense', month, category:selectedCat, amount, note, gst:calcGst(amount), ts:new Date().toISOString()};
+  entries.unshift(entry);
+  localStorage.setItem('gst_entries', JSON.stringify(entries.slice(0,APP_STORAGE_LIMIT)));
+  backupToProfileDB();
+
+  // Save receipt if attached
+  if (pendingReceiptData) {
+    saveReceiptToDocuments(pendingReceiptData, note, selectedCat, month);
+    toast('📄 Receipt saved to My Documents!', 'success');
+    clearReceipt();
+  }
+
+  await pushToSheet(entry);
+
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-note').value = '';
+  selectedCat = null;
+  document.querySelectorAll('.cat-btn').forEach(el => el.classList.remove('selected'));
+  updateExpGST(); renderLog(); updateTotals();
+  btn.disabled = false; btn.textContent = 'Add Expense Entry ➔';
+}
+
+// ── LOG RENDER ────────────────────────────────────────────────────────────
+function renderLog() {
+  const container = document.getElementById('log-list');
+  const show = entries.slice(0,30);
+  if (!show.length) { container.innerHTML = '<div class="log-empty">No entries yet.<br>Start adding income or expenses above.</div>'; return; }
+  container.innerHTML = show.map(e => `
+    <div class="log-item">
+      <div class="log-left">
+        <div class="log-desc">${e.type==='income'?'💰':'💸'} ${e.type==='income'?(e.period||'Income'):e.category}${e.note?` <span style="color:var(--muted)">— ${e.note}</span>`:''}</div>
+        <div class="log-meta">${e.month} · GST: ${fmt(e.gst)}</div>
+      </div>
+      <div class="log-amount ${e.type==='income'?'log-income':'log-expense'}">${e.type==='income'?'+':'-'}${fmt(e.amount)}</div>
+    </div>`).join('');
+}
+
+function updateTotals() {
+  const inc = entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const exp = entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  document.getElementById('sum-income').textContent  = fmt(inc);
+  document.getElementById('sum-expense').textContent = fmt(exp);
+  document.getElementById('sum-gst').textContent     = fmt(calcGst(inc) - calcGst(exp));
+}
+
+// ── MY LOGS MODAL ─────────────────────────────────────────────────────────
+function openLogsModal() {
+  renderLogsModal();
+  document.getElementById('logs-modal').classList.add('open');
+}
+function closeLogsModal() { document.getElementById('logs-modal').classList.remove('open'); }
+
+function renderLogsModal() {
+  const month = document.getElementById('logs-month-filter').value;
+  const type  = document.getElementById('logs-type-filter').value;
+  let filtered = entries;
+  if (month !== 'all') filtered = filtered.filter(e => e.month === month);
+  if (type  !== 'all') filtered = filtered.filter(e => e.type  === type);
+
+  const body = document.getElementById('logs-body');
+  if (!filtered.length) { body.innerHTML = '<div class="log-empty-msg">No entries found for this filter.</div>'; return; }
+
+  body.innerHTML = filtered.map(e => `
+    <div class="log-entry">
+      <div class="log-entry-left">
+        <div class="log-entry-desc">${e.type==='income'?'💰':'💸'} ${e.type==='income'?(e.period||'Income'):e.category}${e.note?` — ${e.note}`:''}</div>
+        <div class="log-entry-meta">${e.month} · ${new Date(e.ts).toLocaleDateString('en-AU')} · GST: ${fmt(e.gst)}</div>
+      </div>
+      <div class="log-entry-amt" style="color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt(e.amount)}</div>
+    </div>`).join('');
+}
+
+document.getElementById('logs-month-filter').addEventListener('change', renderLogsModal);
+document.getElementById('logs-type-filter').addEventListener('change',  renderLogsModal);
+
+function exportLogsPDF() {
+  const month = document.getElementById('logs-month-filter').value;
+  const type  = document.getElementById('logs-type-filter').value;
+  let filtered = entries;
+  if (month !== 'all') filtered = filtered.filter(e => e.month === month);
+  if (type  !== 'all') filtered = filtered.filter(e => e.type  === type);
+
+  if (!filtered.length) return toast('No entries to export.', 'error');
+
+  const totalInc = filtered.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const totalExp = filtered.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const totalGST = filtered.filter(e=>e.type==='income').reduce((s,e)=>s+e.gst,0)
+                 - filtered.filter(e=>e.type==='expense').reduce((s,e)=>s+e.gst,0);
+
+  const rows = filtered.map(e =>
+    `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:8px 10px;">${e.type==='income'?'💰 Income':'💸 Expense'}</td>
+      <td style="padding:8px 10px;">${e.month}</td>
+      <td style="padding:8px 10px;">${e.type==='income'?(e.period||'Income'):e.category}</td>
+      <td style="padding:8px 10px;">${e.note||'—'}</td>
+      <td style="padding:8px 10px;text-align:right;color:${e.type==='income'?'#1a7a4a':'#c0392b'};">${e.type==='income'?'+':'-'}${fmt(e.amount)}</td>
+      <td style="padding:8px 10px;text-align:right;">${fmt(e.gst)}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><title>GST Log Export — EDW</title>
+  <style>body{font-family:Arial,sans-serif;padding:30px;color:#222;}h1{color:#1a1a2e;}h2{color:#555;font-size:14px;font-weight:400;}table{width:100%;border-collapse:collapse;margin-top:20px;}th{background:#1a1a2e;color:#fff;padding:10px;text-align:left;font-size:13px;}td{font-size:13px;}.summary{display:flex;gap:20px;margin-top:24px;}.sum-box{flex:1;background:#f5f5f5;border-radius:8px;padding:14px;}.sum-label{font-size:11px;color:#888;text-transform:uppercase;}.sum-val{font-size:18px;font-weight:700;margin-top:4px;}</style>
+  </head><body>
+  <h1>💰 Smart GST Tracker — Log Export</h1>
+  <h2>Endless Digital World · ${month==='all'?'All Months':month} · ${type==='all'?'All Types':type} · GST Rate: ${getGstRate()}% · Generated ${new Date().toLocaleDateString('en-AU')}</h2>
+  <table><thead><tr><th>Type</th><th>Month</th><th>Category/Period</th><th>Note</th><th style="text-align:right">Amount</th><th style="text-align:right">GST</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  <div class="summary">
+    <div class="sum-box"><div class="sum-label">Total Income</div><div class="sum-val" style="color:#1a7a4a">${fmt(totalInc)}</div></div>
+    <div class="sum-box"><div class="sum-label">Total Expenses</div><div class="sum-val" style="color:#c0392b">${fmt(totalExp)}</div></div>
+    <div class="sum-box"><div class="sum-label">GST Payable to ATO</div><div class="sum-val" style="color:#6c3eaa">${fmt(totalGST)}</div></div>
+  </div>
+  <p style="margin-top:24px;font-size:11px;color:#aaa;">Smart GST Tracker v${APP_VERSION} · Endless Digital World · For personal record-keeping only</p>
+  <${'script'}>window.onload=()=>window.print();</${'script'}>
+  </body></html>`;
+
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+// ── MANAGE CATEGORIES ─────────────────────────────────────────────────────
+function openCatModal() {
+  rearrangeMode = false;
+  const btn = document.getElementById('rearrange-btn');
+  if (btn) { btn.textContent = '⇅ Rearrange'; btn.style.color='var(--muted)'; btn.style.borderColor='var(--border)'; btn.style.background='var(--card)'; }
+  renderCatModalList();
+  document.getElementById('cat-modal').classList.add('open');
+}
+function closeCatModal() {
+  rearrangeMode = false;
+  document.getElementById('cat-modal').classList.remove('open');
+  document.getElementById('new-cat-input').value = '';
+  document.getElementById('cat-detected-msg').style.display = 'none';
+}
+
+function renderCatModalList() {
+  const list = document.getElementById('cat-modal-list');
+  const hint = rearrangeMode
+    ? '<div style="font-size:11px;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><span>☰</span> Drag handles to reorder — click ✓ Done when finished</div>'
+    : '';
+  list.innerHTML = hint +
+    categories.map((cat, i) => `
+    <div class="cat-list-item" ${rearrangeMode ? `draggable="true" data-index="${i}" ondragstart="catDragStart(event,${i})" ondragover="catDragOver(event,${i})" ondragleave="catDragLeave(event)" ondrop="catDrop(event,${i})" ondragend="catDragEnd(event)"` : ''} style="${rearrangeMode ? '' : 'cursor:default;'}">
+      <div class="cat-list-left">
+        ${rearrangeMode ? '<span class="cat-drag-handle">☰</span>' : '<span style="width:23px;display:inline-block;"></span>'}
+        <span class="cat-list-icon">${cat.icon}</span>
+        <span>${cat.name}</span>
+        ${cat.isDefault ? '<span class="cat-default-tag">default</span>' : ''}
+      </div>
+      <button class="cat-delete-btn" onclick="deleteCategory(${i})" title="Remove">✕</button>
+    </div>`).join('');
+}
+
+// ── CATEGORY DRAG & DROP ──────────────────────────────────────────────────
+let catDragSrcIndex = null;
+function catDragStart(e, i) {
+  catDragSrcIndex = i;
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function catDragOver(e, i) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.cat-list-item').forEach(el => el.classList.remove('drag-over'));
+  e.currentTarget.classList.add('drag-over');
+}
+function catDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function catDrop(e, toIndex) {
+  e.preventDefault();
+  if (catDragSrcIndex === null || catDragSrcIndex === toIndex) return;
+  const moved = categories.splice(catDragSrcIndex, 1)[0];
+  categories.splice(toIndex, 0, moved);
+  localStorage.setItem('gst_categories', JSON.stringify(categories));
+  buildCatGrid();
+  renderCatModalList();
+  toast('✅ Categories reordered!', 'success');
+}
+function catDragEnd(e) {
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.cat-list-item').forEach(el => el.classList.remove('drag-over'));
+  catDragSrcIndex = null;
+}
+
+function detectCatEmoji() {
+  const val = document.getElementById('new-cat-input').value.toLowerCase().trim();
+  const msg = document.getElementById('cat-detected-msg');
+  if (!val) { msg.style.display='none'; return; }
+  const match = EMOJI_MAP.find(e => e.keys.some(k => val.includes(k)));
+  if (match) {
+    msg.style.display = 'block';
+    msg.textContent = `✦ Auto-detected emoji: ${match.emoji}`;
+  } else {
+    msg.style.display = 'block';
+    msg.textContent = '✦ Will use 🏷️ (no match found — that\'s OK!)';
+  }
+}
+
+function getEmojiForName(name) {
+  const lower = name.toLowerCase();
+  const match = EMOJI_MAP.find(e => e.keys.some(k => lower.includes(k)));
+  return match ? match.emoji : '🏷️';
+}
+
+async function addCategory() {
+  const input = document.getElementById('new-cat-input');
+  const name = input.value.trim();
+  if (!name) return toast('Please enter a category name.', 'error');
+  if (categories.find(c => c.name.toLowerCase() === name.toLowerCase())) return toast('Category already exists.', 'error');
+
+  const icon = getEmojiForName(name);
+  categories.push({name, icon, isDefault:false});
+  localStorage.setItem('gst_categories', JSON.stringify(categories));
+  input.value = '';
+  document.getElementById('cat-detected-msg').style.display = 'none';
+  renderCatModalList();
+  buildCatGrid();
+  toast(`✅ "${name}" ${icon} added!`, 'success');
+  // Sync new category to Google Sheet
+  await pushCategoryToSheet('add', name, icon);
+}
+
+async function deleteCategory(index) {
+  const cat = categories[index];
+  categories.splice(index, 1);
+  localStorage.setItem('gst_categories', JSON.stringify(categories));
+  renderCatModalList();
+  buildCatGrid();
+  toast(`Removed "${cat.name}"`, 'info');
+  // Sync deletion to Google Sheet
+  await pushCategoryToSheet('delete', cat.name, cat.icon);
+}
+
+// ── WHAT'S NEW ────────────────────────────────────────────────────────────
+function updateWhatsNewBadge() {
+  const clicks = parseInt(localStorage.getItem('wn_clicks_v'+APP_VERSION)||'0');
+  const sub   = document.getElementById('wn-sub-text');
+  const label = document.getElementById('wn-label');
+  if (clicks >= 3) {
+    if (label) label.textContent = 'Release Notes';
+    sub.textContent = 'Update history for all versions';
+    sub.style.color = 'var(--muted)';
+  } else {
+    if (label) label.textContent = "What's New";
+    sub.textContent = `New in v${APP_VERSION} · ${3-clicks} view${3-clicks===1?'':'s'} remaining`;
+    sub.style.color = 'var(--accent)';
+  }
+}
+
+function openWhatsNew() {
+  const clicks    = parseInt(localStorage.getItem('wn_clicks_v'+APP_VERSION)||'0');
+  const newClicks = clicks + 1;
+  localStorage.setItem('wn_clicks_v'+APP_VERSION, newClicks);
+
+  // Cycle label after 3 views — resets to "What's New" on next app version
+  const label = document.getElementById('wn-label');
+  if (newClicks >= 3) {
+    if (label) label.textContent = 'Release Notes';
+  } else {
+    if (label) label.textContent = "What's New";
+  }
+
+  const modalTitle = document.querySelector('#whats-new-modal .whats-new-header h2');
+  if (modalTitle) {
+    modalTitle.innerHTML = newClicks >= 3
+      ? '📋 Release Notes'
+      : '✨ What\'s New';
+  }
+
+  const content = document.getElementById('wn-content');
+  // Current version at top, then previous versions collapsible section
+  const currentVer = WHATS_NEW.find(v => v.version === APP_VERSION);
+  const prevVersions = WHATS_NEW.filter(v => v.version !== APP_VERSION).reverse();
+  
+  let html = '';
+  if (currentVer) {
+    html += `<div class="wn-version-block">
+      <div class="wn-ver-tag">v${currentVer.version} <span style="background:var(--accent);color:#0D1117;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;margin-left:4px;">CURRENT</span></div>
+      ${currentVer.items.map(item => `<div class="wn-item">${item}</div>`).join('')}
+    </div>`;
+  }
+  // Previous versions section
+  if (prevVersions.length) {
+    html += `<div style="padding:14px 20px 6px;border-top:1px solid var(--border);">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:10px;">📚 Previous Versions</div>
+    </div>`;
+    html += prevVersions.map(v => `
+    <div class="wn-version-block">
+      <div class="wn-ver-tag">v${v.version}</div>
+      ${v.items.map(item => `<div class="wn-item">${item}</div>`).join('')}
+    </div>`).join('');
+  }
+  content.innerHTML = html;
+
+  const remaining = Math.max(0, 3 - newClicks);
+  const info = document.getElementById('wn-clicks-info');
+  if (remaining > 0) {
+    info.innerHTML = `Showing as <strong>What's New</strong> for <span>${remaining} more view${remaining===1?'':'s'}</span>, then becomes Release Notes`;
+  } else {
+    info.innerHTML = `<span style="color:var(--muted)">Viewing as <strong style="color:var(--text)">Release Notes</strong> — resets to What's New when v${parseFloat(APP_VERSION)+0.1} releases</span>`;
+  }
+
+  document.getElementById('whats-new-modal').classList.add('open');
+  updateWhatsNewBadge();
+
+  document.getElementById('whats-new-row').style.opacity = newClicks >= 3 ? '0.6' : '1';
+}
+function closeWhatsNew() { document.getElementById('whats-new-modal').classList.remove('open'); }
+
+// ── ABOUT APP ──────────────────────────────────────────────────────────────
+function openAboutApp()  { document.getElementById('about-modal').classList.add('open'); }
+function closeAboutApp() { document.getElementById('about-modal').classList.remove('open'); }
+
+// Toggle sheet warning in confirm modal
+document.addEventListener('change', function(e) {
+  if (e.target && e.target.id === 'del-sheet-data') {
+    document.getElementById('confirm-delete-warning').style.display =
+      e.target.checked ? 'block' : 'none';
+  }
+});
+
+// ── PRIVATE BROWSER WARNING ───────────────────────────────────────────────
+const PRIVATE_WARN_KEY = 'edw_private_warn_ts';
+function checkPrivateBrowser() {
+  const last = parseInt(localStorage.getItem(PRIVATE_WARN_KEY) || '0');
+  const sixHours = 6 * 60 * 60 * 1000;
+  if (Date.now() - last > sixHours) {
+    const modal = document.getElementById('private-browser-modal');
+    modal.style.display = 'flex';
+  }
+}
+function acknowledgePrivateBrowser() {
+  localStorage.setItem(PRIVATE_WARN_KEY, Date.now().toString());
+  document.getElementById('private-browser-modal').style.display = 'none';
+}
+
+// ── BIOMETRICS (WebAuthn) ─────────────────────────────────────────────────
+const BIO_KEY      = 'edw_biometric_enabled';
+const BIO_CRED_KEY = 'edw_biometric_cred_id';
+
+function getBiometricEnabled() { return localStorage.getItem(BIO_KEY) === 'true'; }
+
+async function isBiometricAvailable() {
+  try {
+    if (!window.PublicKeyCredential) return false;
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch { return false; }
+}
+
+async function onBiometricToggle() {
+  const toggle = document.getElementById('biometric-enabled-toggle');
+  const status = document.getElementById('biometric-status');
+  status.style.display = 'block';
+
+  if (toggle.checked) {
+    const available = await isBiometricAvailable();
+    if (!available) {
+      toggle.checked = false;
+      status.textContent = '⚠️ Biometric authentication is not available on this device or browser. Please use HTTPS (e.g. GitHub Pages) for biometrics to work.';
+      status.style.color = 'var(--red)';
+      return;
+    }
+    try {
+      // Register a credential
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      const cred = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: 'Smart GST Tracker', id: location.hostname || 'localhost' },
+          user: { id: new Uint8Array(16), name: 'gst_user', displayName: 'GST User' },
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+          timeout: 60000,
+        }
+      });
+      // Store credential ID
+      const credIdB64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+      localStorage.setItem(BIO_CRED_KEY, credIdB64);
+      localStorage.setItem(BIO_KEY, 'true');
+      status.textContent = '✅ Biometric login enabled! You\'ll be prompted on next open.';
+      status.style.color = 'var(--green)';
+      toast('✅ Biometric login enabled!', 'success');
+    } catch (err) {
+      toggle.checked = false;
+      localStorage.setItem(BIO_KEY, 'false');
+      status.textContent = `⚠️ Could not register biometrics: ${err.message}`;
+      status.style.color = 'var(--red)';
+    }
+  } else {
+    localStorage.setItem(BIO_KEY, 'false');
+    localStorage.removeItem(BIO_CRED_KEY);
+    status.textContent = 'Biometric login disabled.';
+    status.style.color = 'var(--muted)';
+    toast('Biometric login disabled.', 'info');
+  }
+}
+
+async function tryBiometricLogin() {
+  try {
+    const credIdB64 = localStorage.getItem(BIO_CRED_KEY);
+    if (!credIdB64) return false;
+    const credIdBytes = Uint8Array.from(atob(credIdB64), c => c.charCodeAt(0));
+    const challenge   = crypto.getRandomValues(new Uint8Array(32));
+    await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ id: credIdBytes, type: 'public-key' }],
+        userVerification: 'required',
+        timeout: 60000,
+      }
+    });
+    return true;
+  } catch { return false; }
+}
+
+// ── OPEN SETTINGS ─────────────────────────────────────────────────────────
+function openSettings() {
+  updateGstLabels();
+  document.getElementById('pin-enabled-toggle').checked = getPinEnabled();
+  document.getElementById('pin-setup-section').style.display = getPinEnabled() ? 'block' : 'none';
+  if (getPinEnabled()) {
+    document.getElementById('pin-setup-hint').textContent = 'Change PIN (enter new 4-digit PIN):';
+  }
+  pinSetupBuffer = ''; pinSetupPhase = 'set'; pinSetupTemp = '';
+  updateSetupDots();
+  document.getElementById('pin-setup-msg').textContent = '';
+  document.getElementById('settings-modal').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+
+function onPinToggle() {
+  const enabled = document.getElementById('pin-enabled-toggle').checked;
+  const section = document.getElementById('pin-setup-section');
+  if (enabled) {
+    section.style.display = 'block';
+    document.getElementById('pin-setup-hint').textContent = 'Set a 4-digit PIN:';
+    pinSetupBuffer = ''; pinSetupPhase = 'set'; pinSetupTemp = '';
+    updateSetupDots();
+    document.getElementById('pin-setup-msg').textContent = '';
+  } else {
+    section.style.display = 'none';
+    localStorage.setItem('pin_enabled', 'false');
+    localStorage.removeItem('pin_hash');
+    toast('PIN lock disabled.', 'info');
+  }
+}
+
+// PIN Setup
+function updateSetupDots() {
+  for (let i=0;i<4;i++) {
+    document.getElementById('sd'+i).classList.toggle('filled', i < pinSetupBuffer.length);
+  }
+}
+function pinSetupKey(k) {
+  if (pinSetupBuffer.length >= 4) return;
+  pinSetupBuffer += k;
+  updateSetupDots();
+  if (pinSetupBuffer.length === 4) {
+    setTimeout(() => {
+      if (pinSetupPhase === 'set') {
+        pinSetupTemp   = pinSetupBuffer;
+        pinSetupBuffer = '';
+        pinSetupPhase  = 'confirm';
+        document.getElementById('pin-setup-hint').textContent = 'Confirm your PIN:';
+        updateSetupDots();
+        document.getElementById('pin-setup-msg').textContent = '';
+      } else {
+        if (pinSetupBuffer === pinSetupTemp) {
+          localStorage.setItem('pin_enabled', 'true');
+          localStorage.setItem('pin_hash', hashPin(pinSetupBuffer));
+          pinSetupBuffer = ''; pinSetupPhase = 'set'; pinSetupTemp = '';
+          updateSetupDots();
+          document.getElementById('pin-setup-hint').textContent = 'PIN saved! Change PIN (enter new 4-digit PIN):';
+          document.getElementById('pin-setup-msg').textContent = '✅ PIN saved successfully!';
+          toast('🔐 PIN lock enabled!', 'success');
+        } else {
+          pinSetupBuffer = ''; pinSetupTemp = ''; pinSetupPhase = 'set';
+          updateSetupDots();
+          document.getElementById('pin-setup-hint').textContent = 'PINs didn\'t match — try again:';
+          document.getElementById('pin-setup-msg').textContent = '❌ PINs did not match. Please try again.';
+        }
+      }
+    }, 120);
+  }
+}
+function pinSetupDel() {
+  pinSetupBuffer = pinSetupBuffer.slice(0,-1);
+  updateSetupDots();
+}
+
+// PIN Lock Screen
+function updateLockDots() {
+  for (let i=0;i<4;i++) {
+    document.getElementById('ld'+i).classList.toggle('filled', i < pinLockBuffer.length);
+  }
+}
+function pinLockKey(k) {
+  if (pinLockBuffer.length >= 4) return;
+  pinLockBuffer += k;
+  updateLockDots();
+  document.getElementById('lock-error').textContent = '';
+  if (pinLockBuffer.length === 4) {
+    setTimeout(() => {
+      if (hashPin(pinLockBuffer) === getPin()) {
+        document.getElementById('pin-lock').classList.remove('active');
+        pinLockBuffer = '';
+        updateLockDots();
+      } else {
+        document.getElementById('lock-error').textContent = '❌ Incorrect PIN. Try again.';
+        pinLockBuffer = '';
+        updateLockDots();
+      }
+    }, 120);
+  }
+}
+function pinLockDel() {
+  pinLockBuffer = pinLockBuffer.slice(0,-1);
+  updateLockDots();
+  document.getElementById('lock-error').textContent = '';
+}
+
+async function biometricLogin() {
+  const btn = document.getElementById('bio-login-btn');
+  if (btn) btn.textContent = '⏳ Verifying…';
+  const success = await tryBiometricLogin();
+  if (success) {
+    document.getElementById('pin-lock').classList.remove('active');
+    toast('✅ Biometric login successful!', 'success');
+  } else {
+    if (btn) { btn.innerHTML = '<span style="font-size:22px;">🔏</span> Use Face ID / Touch ID'; }
+    document.getElementById('lock-error').textContent = 'Biometric verification failed — try your PIN.';
+  }
+}
+
+// ── GST RATE SAVE ─────────────────────────────────────────────────────────
+async function saveGstRate() {
+  const val = parseFloat(document.getElementById('gst-rate-input').value);
+  if (!val || val < 1 || val > 50) return toast('Please enter a valid GST rate (1–50%).', 'error');
+  localStorage.setItem('gst_rate', val);
+  updateGstLabels();
+  updateGST(); updateExpGST(); updateTotals();
+  toast(`✅ GST rate updated to ${val}%!`, 'success');
+  await pushGstRateToSheet(val);
+}
+
+// ── PRIVACY ───────────────────────────────────────────────────────────────
+function openPrivacy()  { document.getElementById('privacy-modal').classList.add('open'); }
+function closePrivacy() { document.getElementById('privacy-modal').classList.remove('open'); }
+
+// ── CONFIRM DELETE ────────────────────────────────────────────────────────
+function confirmDeleteAll() {
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.remove('open');
+}
+function executeDeleteAll() {
+  const delApp   = document.getElementById('del-app-data').checked;
+  const delSheet = document.getElementById('del-sheet-data').checked;
+
+  if (!delApp && !delSheet) {
+    toast('Please select at least one option.', 'error');
+    return;
+  }
+
+  if (delApp) {
+    localStorage.removeItem('gst_entries');
+    localStorage.removeItem('gst_categories');
+    localStorage.removeItem('pin_enabled');
+    localStorage.removeItem('pin_hash');
+    localStorage.removeItem('gst_rate');
+    WHATS_NEW.forEach(v => localStorage.removeItem('wn_clicks_v'+v.version));
+    entries    = [];
+    categories = DEFAULT_CATS.map(c=>({...c}));
+    renderLog(); updateTotals(); buildCatGrid(); updateGstLabels();
+    document.getElementById('pin-lock').classList.remove('active');
+  }
+
+  if (delSheet) {
+    const url = getSheetUrl();
+    if (url && url !== 'skipped') {
+      MONTHS.forEach(month => {
+        fetch(`${url}?type=deleteMonth&month=${encodeURIComponent(month)}`, { method:'GET', mode:'no-cors' });
+      });
+      toast('☁️ Sheet clear request sent. App data deleted.', 'info');
+    } else {
+      toast('No sheet connected — only app data deleted.', 'info');
+    }
+  } else {
+    toast('🗑️ App data deleted permanently.', 'info');
+  }
+
+  closeConfirm();
+}
+
+// ── PROGRESS / GAMIFICATION ───────────────────────────────────────────────
+let progressChart = null;
+let chartView = 'profit';
+
+function getMonthlyData() {
+  const map = {};
+  entries.forEach(e => {
+    if (!map[e.month]) map[e.month] = {income:0, expense:0, gst:0};
+    if (e.type === 'income')  { map[e.month].income  += e.amount; map[e.month].gst += e.gst; }
+    if (e.type === 'expense') { map[e.month].expense += e.amount; map[e.month].gst -= e.gst; }
+  });
+  // Sort by calendar order
+  const order = MONTHS;
+  return Object.entries(map)
+    .sort((a,b) => order.indexOf(a[0]) - order.indexOf(b[0]))
+    .map(([month, d]) => ({
+      month,
+      income:  d.income,
+      expense: d.expense,
+      profit:  d.income - d.expense,
+      gst:     Math.max(0, d.gst)
+    }));
+}
+
+function switchChartView(view) {
+  chartView = view;
+  ['profit','income','expense','gst'].forEach(v => {
+    document.getElementById('ptab-'+v).classList.toggle('active', v===view);
+  });
+  drawChart(getMonthlyData());
+}
+
+function drawChart(monthlyData) {
+  const ctx = document.getElementById('progress-chart').getContext('2d');
+  if (progressChart) { progressChart.destroy(); progressChart = null; }
+
+  const labels = monthlyData.map(d => d.month.substring(0,3));
+  let data, color, label;
+
+  if (chartView === 'profit') {
+    data = monthlyData.map(d => d.profit);
+    color = '#3DDC84'; label = 'Net Profit';
+  } else if (chartView === 'income') {
+    data = monthlyData.map(d => d.income);
+    color = '#3DDC84'; label = 'Income';
+  } else if (chartView === 'expense') {
+    data = monthlyData.map(d => d.expense);
+    color = '#FF6B6B'; label = 'Expenses';
+  } else {
+    data = monthlyData.map(d => d.gst);
+    color = '#A78BFA'; label = 'GST Payable';
+  }
+
+  progressChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data,
+        backgroundColor: data.map(v => v >= 0 ? color + 'CC' : '#FF6B6BCC'),
+        borderColor:     data.map(v => v >= 0 ? color : '#FF6B6B'),
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => label + ': ' + fmt(ctx.raw)
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#30363D' }, ticks: { color: '#8B949E', font: { size: 11 } } },
+        y: { grid: { color: '#30363D' }, ticks: { color: '#8B949E', font: { size: 11 }, callback: v => '$'+v.toLocaleString() } }
+      }
+    }
+  });
+}
+
+function renderProgress() {
+  const monthly = getMonthlyData();
+  const totalInc = entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const totalExp = entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const netProfit = totalInc - totalExp;
+  const totalGst  = entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.gst,0)
+                  - entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.gst,0);
+
+  document.getElementById('prog-total-inc').textContent = fmt(totalInc);
+  document.getElementById('prog-total-exp').textContent = fmt(totalExp);
+  document.getElementById('prog-net').textContent       = fmt(netProfit);
+  document.getElementById('prog-gst').textContent       = fmt(Math.max(0,totalGst));
+  document.getElementById('streak-val').textContent     = monthly.length;
+
+  const bestProfit = monthly.length ? Math.max(...monthly.map(m=>m.profit)) : 0;
+  document.getElementById('best-profit-disp').textContent = fmt(bestProfit);
+
+  // Chart
+  drawChart(monthly);
+
+  // Rankings — sorted by profit descending
+  const ranked = [...monthly].sort((a,b) => b.profit - a.profit);
+  const rankList = document.getElementById('rank-list');
+
+  if (!ranked.length) {
+    rankList.innerHTML = '<div class="log-empty">No data yet — add some entries to see your rankings!</div>';
+    return;
+  }
+
+  const medals = ['🥇','🥈','🥉'];
+  const badgeClass = ['gold','silver','bronze'];
+  const badgeLabel = ['🏆 Best Month','🥈 2nd Place','🥉 3rd Place'];
+
+  rankList.innerHTML = ranked.map((m, i) => {
+    const medal = i < 3 ? medals[i] : `<span style="font-size:14px;color:var(--muted);font-weight:700;">#${i+1}</span>`;
+    const badge = i < 3 ? `<span class="rank-badge ${badgeClass[i]}">${badgeLabel[i]}</span>` : '';
+    return `
+      <div class="rank-card">
+        <div class="rank-medal">${medal}</div>
+        <div style="flex:1;">
+          <div class="rank-num">Rank #${i+1}</div>
+          <div class="rank-month">${m.month}</div>
+          <div class="rank-sub">Income: ${fmt(m.income)} · Expenses: ${fmt(m.expense)}</div>
+          ${badge}
+        </div>
+        <div style="text-align:right;">
+          <div class="rank-profit">${fmt(m.profit)}</div>
+          <div style="font-size:10px;color:var(--muted);">profit</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── FETCH DATA FROM SHEET ─────────────────────────────────────────────────
+async function fetchSheetData() {
+  const sheetUrl = getSheetUrl();
+  if (!sheetUrl || sheetUrl === 'skipped') {
+    toast('No sheet connected — set up your Sheet URL first.', 'error');
+    openReconnectSheet();
+    return;
+  }
+  const btn    = document.getElementById('get-data-btn');
+  const status = document.getElementById('sync-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Fetching…';
+  status.style.display = 'none';
+
+  try {
+    // Request all 12 months in parallel
+    const monthFetches = MONTHS.map(month =>
+      fetch(`${sheetUrl}?type=getData&month=${encodeURIComponent(month)}`, { method: 'GET' })
+        .then(r => r.json())
+        .then(d => ({ month, ...d }))
+        .catch(() => ({ month, status: 'error' }))
+    );
+
+    const results = await Promise.all(monthFetches);
+    const loaded  = results.filter(r => r.status === 'ok' && (r.income > 0 || r.expense > 0));
+
+    if (!loaded.length) {
+      status.style.display = 'block';
+      status.innerHTML = `<div class="sync-error-box">
+        ⚠️ No data found in your sheet yet.<br><br>
+        <span style="color:var(--text);">This is normal if you haven't added any income or expenses to your Google Sheet yet. Add some entries first, then sync again!</span><br><br>
+        <span style="font-size:12px;color:var(--muted);">If you've already added data and still see this, make sure your Apps Script is deployed correctly with access set to <strong style="color:var(--text);">Anyone</strong>. Check your setup guide or contact us at endlessdigitalworld@gmail.com</span>
+      </div>`;
+      btn.disabled = false;
+      btn.textContent = '☁️ Get Data from Sheet';
+      return;
+    }
+
+    // Merge sheet data into entries (as synthetic 'sheet-import' entries)
+    // Remove any previously imported sheet entries to avoid duplication
+    entries = entries.filter(e => e.source !== 'sheet-import');
+
+    loaded.forEach(r => {
+      if (r.income > 0) {
+        entries.push({
+          type: 'income', month: r.month, period: 'Sheet Import',
+          amount: r.income, note: 'Imported from Google Sheet',
+          gst: r.incomeGst || calcGst(r.income),
+          ts: new Date().toISOString(), source: 'sheet-import'
+        });
+      }
+      if (r.expense > 0) {
+        entries.push({
+          type: 'expense', month: r.month, category: 'Sheet Import',
+          amount: r.expense, note: 'Imported from Google Sheet',
+          gst: r.expenseGst || calcGst(r.expense),
+          ts: new Date().toISOString(), source: 'sheet-import'
+        });
+      }
+    });
+
+    localStorage.setItem('gst_entries', JSON.stringify(entries.slice(0,APP_STORAGE_LIMIT)));
+    renderLog(); updateTotals(); renderProgress();
+
+    // Build summary display
+    const rows = loaded.map(r => `
+      <div class="sync-month-row">
+        <span class="sync-month-name">${r.month}</span>
+        <div class="sync-month-vals">
+          <span class="sync-inc">+${fmt(r.income)}</span>
+          <span class="sync-exp">−${fmt(r.expense)}</span>
+          <span class="sync-gst">GST ${fmt(r.netGst || 0)}</span>
+        </div>
+      </div>`).join('');
+
+    status.style.display = 'block';
+    status.innerHTML = `
+      <div class="sync-summary">✅ ${loaded.length} month${loaded.length>1?'s':''} loaded from your sheet!</div>
+      ${rows}
+      <div style="font-size:11px;color:var(--muted);margin-top:12px;text-align:center;">
+        Data merged into rankings & chart above. Re-sync anytime to refresh.
+      </div>`;
+
+    toast(`✅ Loaded ${loaded.length} months from Google Sheet!`, 'success');
+
+  } catch (err) {
+    status.style.display = 'block';
+    status.innerHTML = `<div class="sync-error-box">
+      ❌ Could not connect to your Google Sheet.<br><br>
+      Please check that your Apps Script URL is correct and deployed with access set to <strong style="color:var(--text);">"Anyone"</strong>. You can update your URL via the menu → Change Sheet URL.<br><br>
+      <span style="font-size:11px;color:var(--muted);">Still having trouble? Contact us at endlessdigitalworld@gmail.com</span>
+    </div>`;
+    toast('Sync failed — see details below.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '☁️ Get Data from Sheet';
+}
+
+// ── MODIFY SHEET URL ──────────────────────────────────────────────────────
+function openModifySheetUrl() {
+  const url = getSheetUrl();
+  const display = document.getElementById('modify-url-current');
+  if (!url || url === 'skipped') {
+    display.textContent = 'No sheet connected';
+    display.style.color = 'var(--muted)';
+  } else {
+    display.textContent = url;
+    display.style.color = 'var(--green)';
+  }
+  document.getElementById('modify-url-confirm').style.display = 'none';
+  document.getElementById('modify-url-modal').classList.add('open');
+}
+function closeModifySheetUrl() {
+  document.getElementById('modify-url-modal').classList.remove('open');
+}
+function confirmRemoveSheetUrl() {
+  document.getElementById('modify-url-confirm').style.display = 'block';
+}
+function cancelRemoveSheetUrl() {
+  document.getElementById('modify-url-confirm').style.display = 'none';
+}
+function executeRemoveSheetUrl() {
+  localStorage.setItem(SHEET_URL_KEY, 'skipped');
+  closeModifySheetUrl();
+  updateConnectionStatus();
+  toast('Sheet URL removed. Using app without Google Sheets.', 'info');
+}
+
+// ── HELP & SUPPORT ────────────────────────────────────────────────────────
+function openHelpModal() {
+  document.getElementById('help-modal').classList.add('open');
+}
+function closeHelpModal() {
+  document.getElementById('help-modal').classList.remove('open');
+}
+function sendHelpEmail() {
+  const subject = document.getElementById('help-subject').value.trim() || 'Smart GST Tracker — Support Request';
+  const body    = document.getElementById('help-body').value.trim();
+  if (!body) { toast('Please describe your question or issue.', 'error'); return; }
+  const mailto = `mailto:endlessdigitalworld@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n— Sent from Smart GST Tracker v' + APP_VERSION)}`;
+  window.open(mailto);
+  toast('✅ Opening email app…', 'success');
+}
+
+// ── REWARDS & POINTS ──────────────────────────────────────────────────────
+function getPoints() { return parseInt(localStorage.getItem('edw_points') || '0'); }
+function setPoints(p) {
+  localStorage.setItem('edw_points', p);
+  updateDrawerPointsSub();
+}
+function calcPointsForIncome(amount) {
+  if (amount > 2000) return 5000;
+  if (amount > 1000) return 2000;
+  if (amount > 100)  return 500;
+  if (amount > 50)   return 15;
+  if (amount > 1)    return 5;
+  return 0;
+}
+function awardPoints(amount) {
+  const pts = calcPointsForIncome(amount);
+  if (pts <= 0) return;
+  const total = getPoints() + pts;
+  setPoints(total);
+  toast(`🏅 +${pts} points! You now have ${total} pts.`, 'success');
+}
+function updateDrawerPointsSub() {
+  const sub = document.getElementById('drawer-points-sub');
+  if (sub) sub.textContent = `${getPoints()} points earned`;
+}
+function openRewardsModal() {
+  document.getElementById('rewards-points-display').textContent = getPoints();
+  document.getElementById('rewards-modal').classList.add('open');
+}
+function closeRewardsModal() {
+  document.getElementById('rewards-modal').classList.remove('open');
+}
+function sharePoints(method) {
+  const pts = getPoints();
+  const msg = `🏅 I've earned ${pts} points on Smart GST Tracker by Endless Digital World! Track your income & GST like a pro. 💰 #SmartGSTTracker #EDW`;
+  if (method === 'instagram') {
+    // Try to open Instagram app directly; copy text as fallback
+    navigator.clipboard.writeText(msg).then(() => {
+      toast('📋 Score copied! Opening Instagram…', 'info');
+      setTimeout(() => {
+        // Try deep link to Instagram Stories on mobile
+        const igDeep = 'instagram-stories://share';
+        const igApp  = 'instagram://app';
+        // On mobile devices try the deep link; fallback to instagram.com
+        try {
+          window.location.href = igApp;
+          setTimeout(() => window.open('https://www.instagram.com/', '_blank'), 1500);
+        } catch {
+          window.open('https://www.instagram.com/', '_blank');
+        }
+      }, 600);
+    }).catch(() => {
+      toast('Please copy manually: ' + msg, 'info');
+      setTimeout(() => window.open('https://www.instagram.com/', '_blank'), 800);
+    });
+  } else if (method === 'copy') {
+    navigator.clipboard.writeText(msg).then(() => {
+      toast('📋 Score copied to clipboard!', 'success');
+    }).catch(() => {
+      toast('Could not copy — please copy manually.', 'error');
+    });
+  } else if (method === 'native') {
+    if (navigator.share) {
+      navigator.share({ title: 'My Smart GST Tracker Score', text: msg });
+    } else {
+      navigator.clipboard.writeText(msg).then(() => {
+        toast('📋 Score copied to clipboard!', 'success');
+      });
+    }
+  }
+}
+
+// ── RECEIPT HANDLING ──────────────────────────────────────────────────────
+let pendingReceiptData = null; // { name, dataUrl, type }
+
+function previewReceipt(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    pendingReceiptData = { name: file.name, dataUrl: e.target.result, type: file.type, ts: new Date().toISOString() };
+    const preview = document.getElementById('receipt-preview');
+    document.getElementById('receipt-filename').textContent = file.name;
+    preview.style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearReceipt() {
+  pendingReceiptData = null;
+  document.getElementById('receipt-preview').style.display = 'none';
+  document.getElementById('receipt-file-input').value = '';
+}
+
+function saveReceiptToDocuments(receipt, entryNote, category, month) {
+  const docs = JSON.parse(localStorage.getItem('edw_documents') || '[]');
+  docs.unshift({
+    id: Date.now(),
+    name: receipt.name,
+    dataUrl: receipt.dataUrl,
+    type: receipt.type,
+    entryNote: entryNote || '',
+    category: category || '',
+    month: month || '',
+    ts: receipt.ts
+  });
+  // Limit to 200 documents
+  localStorage.setItem('edw_documents', JSON.stringify(docs.slice(0, 200)));
+  saveProfileData('edw_documents_backup', JSON.stringify(docs.slice(0, 200)));
+}
+
+function openMyDocuments() {
+  renderMyDocuments();
+  document.getElementById('my-documents-modal').classList.add('open');
+}
+function closeMyDocuments() {
+  document.getElementById('my-documents-modal').classList.remove('open');
+}
+
+function renderMyDocuments() {
+  const docs = JSON.parse(localStorage.getItem('edw_documents') || '[]');
+  const body = document.getElementById('my-documents-body');
+  if (!docs.length) {
+    body.innerHTML = '<div class="log-empty-msg" style="padding:32px 0;text-align:center;color:var(--muted);">No receipts saved yet.<br>Attach receipts when logging expenses.</div>';
+    return;
+  }
+  body.innerHTML = docs.map((doc, i) => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:28px;flex-shrink:0;">${doc.type && doc.type.startsWith('image') ? '🖼️' : '📄'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${doc.name}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${doc.category || ''} · ${doc.month || ''} · ${new Date(doc.ts).toLocaleDateString('en-AU')}</div>
+        ${doc.entryNote ? `<div style="font-size:11px;color:var(--muted);">${doc.entryNote}</div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+        <button onclick="viewDocument(${i})" style="background:var(--accent);color:#0D1117;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;">View</button>
+        <button onclick="deleteDocument(${i})" style="background:var(--expense-bg);color:var(--red);border:1px solid rgba(255,107,107,0.3);border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function viewDocument(index) {
+  const docs = JSON.parse(localStorage.getItem('edw_documents') || '[]');
+  const doc = docs[index];
+  if (!doc) return;
+  // Open document in new window / download
+  const w = window.open('', '_blank');
+  if (doc.type && doc.type.startsWith('image')) {
+    w.document.write(`<!DOCTYPE html><html><head><title>${doc.name}</title></head><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${doc.dataUrl}" style="max-width:100%;max-height:100vh;object-fit:contain;"></body></html>`);
+  } else {
+    // For PDFs and other files — trigger download
+    const a = document.createElement('a');
+    a.href = doc.dataUrl;
+    a.download = doc.name;
+    a.click();
+    w.close();
+  }
+}
+
+function deleteDocument(index) {
+  const docs = JSON.parse(localStorage.getItem('edw_documents') || '[]');
+  docs.splice(index, 1);
+  localStorage.setItem('edw_documents', JSON.stringify(docs));
+  saveProfileData('edw_documents_backup', JSON.stringify(docs));
+  renderMyDocuments();
+  toast('Receipt deleted.', 'info');
+}
+
+
+// ── SETUP GUIDE PDF ───────────────────────────────────────────────────────
+function openSetupGuidePDF() {
+  const html = `<!DOCTYPE html><html><head><title>Smart GST Tracker — Setup Guide</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #222; margin: 0; padding: 0; }
+    .page { width: 210mm; min-height: 297mm; padding: 20mm 22mm; box-sizing: border-box; page-break-after: always; position: relative; }
+    .page:last-child { page-break-after: auto; }
+    h1 { color: #1a1a2e; font-size: 22px; margin-bottom: 6px; }
+    h2 { color: #1a1a2e; font-size: 16px; margin-top: 24px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+    p, li { font-size: 12px; line-height: 1.7; color: #444; }
+    ul { padding-left: 18px; }
+    .cover-logo { font-size: 56px; text-align: center; margin: 30px 0 10px; }
+    .cover-title { font-size: 28px; font-weight: 900; color: #1a1a2e; text-align: center; }
+    .cover-sub { font-size: 13px; color: #666; text-align: center; margin-top: 6px; }
+    .cover-version { font-size: 11px; color: #f0b429; text-align: center; margin-top: 4px; font-weight: 700; }
+    .step-box { background: #f9f9f9; border-left: 3px solid #f0b429; border-radius: 6px; padding: 12px 16px; margin-bottom: 12px; }
+    .step-num { font-size: 11px; font-weight: 700; color: #f0b429; text-transform: uppercase; letter-spacing: 0.06em; }
+    .tip { background: #e8f8f1; border-left: 3px solid #3DDC84; border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 11px; color: #1a5c38; }
+    .warn { background: #fff8e6; border-left: 3px solid #f0b429; border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 11px; color: #7a5500; }
+    .footer { position: absolute; bottom: 14mm; left: 22mm; right: 22mm; display: flex; justify-content: space-between; font-size: 9px; color: #aaa; border-top: 1px solid #eee; padding-top: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th { background: #1a1a2e; color: #fff; padding: 8px 10px; font-size: 11px; text-align: left; }
+    td { padding: 8px 10px; font-size: 11px; border-bottom: 1px solid #eee; }
+    .disclaimer { font-size: 7px; color: #bbb; line-height: 1.5; }
+    @media print { body { margin: 0; } }
+  </style>
+  </head><body>
+
+  <!-- PAGE 1: COVER -->
+  <div class="page">
+    <div style="height:60mm;"></div>
+    <div class="cover-logo">💰</div>
+    <div class="cover-title">Smart GST Tracker</div>
+    <div class="cover-sub">Complete Setup &amp; User Guide</div>
+    <div class="cover-sub" style="margin-top:4px;">by <strong>Endless Digital World</strong></div>
+    <div class="cover-version">Version 1.8.2</div>
+    <div style="height:30mm;"></div>
+    <div style="background:#f9f9f9;border:1px solid #eee;border-radius:10px;padding:16px 20px;text-align:center;">
+      <p style="margin:0;font-size:12px;color:#555;">This guide covers everything you need to set up and use<br>Smart GST Tracker and your connected Google Sheet.</p>
+    </div>
+    <div class="footer"><span>Smart GST Tracker — Setup Guide</span><span>Page 1 of 7</span></div>
+  </div>
+
+  <!-- PAGE 2: GETTING STARTED -->
+  <div class="page">
+    <h1>Getting Started</h1>
+    <p>Welcome to Smart GST Tracker — the easiest way to track your income, expenses, and GST as an Australian small business owner or sole trader. This guide walks you through the initial setup and core features.</p>
+    <h2>What You Need</h2>
+    <ul>
+      <li>A modern web browser (Chrome, Safari, Firefox, Edge)</li>
+      <li>A Google account (for Google Sheets integration)</li>
+      <li>Your Smart GST Tracker Google Sheet (included in your Etsy purchase)</li>
+    </ul>
+    <h2>Step-by-Step Setup</h2>
+    <div class="step-box">
+      <div class="step-num">Step 1 — Open Your Google Sheet</div>
+      <p>Use the link provided in your Etsy purchase to open the Smart GST Tracker Google Sheet. Go to <strong>File → Make a copy</strong> to save it to your own Google Drive.</p>
+    </div>
+    <div class="step-box">
+      <div class="step-num">Step 2 — Deploy Your Apps Script</div>
+      <p>In your Google Sheet, go to <strong>Extensions → Apps Script</strong>. Click <strong>Deploy → New deployment</strong>. Select <strong>Web app</strong>. Set "Who has access" to <strong>Anyone</strong>. Click Deploy and authorise. Copy the URL provided.</p>
+    </div>
+    <div class="step-box">
+      <div class="step-num">Step 3 — Connect the App</div>
+      <p>Open Smart GST Tracker in your browser. On the setup screen, paste your Apps Script URL and tap <strong>Connect My Sheet</strong>. Done!</p>
+    </div>
+    <div class="tip">💡 Tip: Bookmark the app in your browser for instant access.</div>
+    <div class="footer"><span>Smart GST Tracker — Setup Guide</span><span>Page 2 of 7</span></div>
+  </div>
+
+  <!-- PAGE 3: LOGGING INCOME & EXPENSES -->
+  <div class="page">
+    <h1>Logging Income &amp; Expenses</h1>
+    <h2>Recording Income</h2>
+    <p>Tap <strong>Income</strong> on the main screen to record an income entry.</p>
+    <ul>
+      <li><strong>Month:</strong> Select the month this income belongs to.</li>
+      <li><strong>Period:</strong> Choose Week 1–4 or Full Month.</li>
+      <li><strong>Amount:</strong> Enter the total amount <em>including GST</em>. The app automatically splits out the GST and ex-GST amounts.</li>
+      <li><strong>Note:</strong> Optionally add a description.</li>
+    </ul>
+    <div class="tip">💡 Always enter the full amount including GST — the app calculates everything automatically.</div>
+    <h2>Recording Expenses</h2>
+    <p>Tap <strong>Expense</strong> on the main screen to record an expense.</p>
+    <ul>
+      <li><strong>Category:</strong> Select or create a category (e.g. Fuel, Insurance, Tolls).</li>
+      <li><strong>Amount:</strong> Enter the total amount including GST.</li>
+      <li><strong>Note:</strong> Add a description for your records.</li>
+      <li><strong>Receipt (optional):</strong> Attach a photo or PDF receipt — saved to My Documents.</li>
+    </ul>
+    <h2>Receipt Scanning</h2>
+    <p>When submitting an expense you can attach a photo or PDF receipt. Access saved receipts at any time via <strong>☰ Menu → My Documents</strong>.</p>
+    <div class="warn">⚠️ Receipts are stored locally. Export important receipts for long-term backup.</div>
+    <div class="footer"><span>Smart GST Tracker — Setup Guide</span><span>Page 3 of 7</span></div>
+  </div>
+
+  <!-- PAGE 4: GOOGLE SHEETS FEATURES -->
+  <div class="page">
+    <h1>Google Sheets Features</h1>
+    <p>Your Smart GST Tracker Google Sheet is a powerful companion to the app. Every entry syncs instantly.</p>
+    <h2>Monthly Sheets</h2>
+    <p>The workbook has 12 monthly tabs (January–December). Each records income, expense categories, GST, and ex-GST totals. Rows are added automatically with each entry.</p>
+    <h2>Dashboard Overview</h2>
+    <p>The Dashboard tab shows a full financial year view — income, expenses, net profit, and GST payable for every month. Charts update automatically.</p>
+    <h2>Quarterly ATO Breakdown</h2>
+    <p>Quarterly totals are aligned to ATO BAS periods (Q1–Q4) with GST payable per quarter, making BAS lodgement much easier.</p>
+    <h2>Syncing Data to the App</h2>
+    <p>Go to <strong>☰ Menu → My Progress</strong> and tap <strong>Get Data from Sheet</strong> to load all 12 months into the app for charts and rankings.</p>
+    <h2>Custom Categories</h2>
+    <p>Categories you add in the app are automatically synced to your Google Sheet with the correct GST formula.</p>
+    <table>
+      <tr><th>Sheet Tab</th><th>Purpose</th></tr>
+      <tr><td>January–December</td><td>Monthly income &amp; expense entries</td></tr>
+      <tr><td>Dashboard</td><td>Full-year overview &amp; charts</td></tr>
+      <tr><td>Quarterly</td><td>ATO BAS period breakdowns</td></tr>
+    </table>
+    <div class="footer"><span>Smart GST Tracker — Setup Guide</span><span>Page 4 of 7</span></div>
+  </div>
+
+  <!-- PAGE 5: APP FEATURES & SETTINGS -->
+  <div class="page">
+    <h1>App Features &amp; Settings</h1>
+    <h2>Rewards &amp; Points</h2>
+    <p>Every time you log income you earn points. Access your total via <strong>☰ Menu → Rewards &amp; Points</strong>. Share your score on Instagram Stories or copy it to clipboard.</p>
+    <h2>My Progress</h2>
+    <p>Access <strong>☰ Menu → My Progress</strong> for monthly profit rankings with 🥇🥈🥉 medals, interactive charts, and statistics.</p>
+    <h2>PIN Lock</h2>
+    <p>Protect the app with a 4-digit PIN under <strong>☰ Menu → Settings → Security → Enable PIN Lock</strong>.</p>
+    <h2>GST Rate</h2>
+    <p>The default is Australia's 10% GST rate. Change it under <strong>☰ Menu → Settings → GST Rate</strong>. The new rate syncs to your sheet automatically.</p>
+    <h2>Personal Profile</h2>
+    <p>Your profile and data are stored permanently using IndexedDB — a browser storage system that survives clearing browser history. Re-enter your name after clearing history to restore all data.</p>
+    <h2>My Documents</h2>
+    <p>Receipts attached to expense entries are stored here. Access via <strong>☰ Menu → My Documents</strong>.</p>
+    <div class="tip">💡 Use "Get Data from Sheet" regularly to keep charts and rankings current.</div>
+    <div class="footer"><span>Smart GST Tracker — Setup Guide</span><span>Page 5 of 7</span></div>
+  </div>
+
+  <!-- PAGE 6: TROUBLESHOOTING & FAQ -->
+  <div class="page">
+    <h1>Troubleshooting &amp; FAQ</h1>
+    <h2>Entries not appearing in my Google Sheet</h2>
+    <p>Check that your Apps Script URL is correct and the deployment access is set to <strong>Anyone</strong>. Go to your Google Sheet → Extensions → Apps Script → Deploy → Manage deployments to verify.</p>
+    <h2>Sync shows "No data found"</h2>
+    <p>This is normal if no data has been added to the sheet yet. Log entries through the app first, then sync. If data exists but won't load, re-deploy the Apps Script with a new deployment version.</p>
+    <h2>App not remembering data after browser clear</h2>
+    <p>Open the app and enter your name when prompted — your data will be restored automatically from permanent storage.</p>
+    <h2>How do I change my Google Sheet URL?</h2>
+    <p>Go to <strong>☰ Menu → Settings → Modify Google Sheet URL</strong>.</p>
+    <h2>Can I use the app without Google Sheets?</h2>
+    <p>Yes. During setup, tap <strong>Skip for now</strong>. Connect a sheet later from Settings.</p>
+    <h2>Contact &amp; Support</h2>
+    <p>Email: <strong>endlessdigitalworld@gmail.com</strong><br>Response within 7 business days.</p>
+    <h2>Your Privacy &amp; Data Collection</h2>
+    <p>Endless Digital World (EDW) may collect your name and email address for the purpose of informing you about new services, product updates, or launches — such as bookkeeping services offered by EDW. Rest assured your details are <strong>never shared with any third party</strong>. You may contact us at any time at endlessdigitalworld@gmail.com to have your details removed from our records.</p>
+    <br><br>
+    <p class="disclaimer">The sole purpose of this app is for personal record keeping and EDW (Endless Digital World) doesn't constitute to any liabilities and you should always seek an advice from your financial advisor.</p>
+    <div class="footer"><span>Smart GST Tracker — Setup Guide</span><span>Page 6 of 7</span></div>
+  </div>
+
+  <!-- PAGE 7: QUICK REFERENCE -->
+  <div class="page">
+    <h1>Quick Reference</h1>
+    <h2>Menu Overview</h2>
+    <table>
+      <tr><th>Menu Item</th><th>What It Does</th></tr>
+      <tr><td>📂 My Logs</td><td>Browse entries, filter by month/type, export PDF</td></tr>
+      <tr><td>📁 My Documents</td><td>View and manage saved receipts</td></tr>
+      <tr><td>🗂️ Manage Categories</td><td>Add, remove, and reorder expense categories</td></tr>
+      <tr><td>🏆 My Progress</td><td>Rankings, charts, stats and Google Sheet sync</td></tr>
+      <tr><td>✨ What's New</td><td>Latest updates for each version</td></tr>
+      <tr><td>ℹ️ About This App</td><td>Feature guide and tips</td></tr>
+      <tr><td>🏅 Rewards &amp; Points</td><td>View and share your points score</td></tr>
+      <tr><td>⚙️ Settings</td><td>PIN lock, GST rate, sheet URL</td></tr>
+      <tr><td>🆘 Help &amp; Support</td><td>Email support + setup guide</td></tr>
+      <tr><td>🔒 Privacy Policy</td><td>How your data is handled</td></tr>
+    </table>
+    <h2>Points Tiers</h2>
+    <table>
+      <tr><th>Income Amount</th><th>Points Awarded</th></tr>
+      <tr><td>Over $1</td><td>+5 points</td></tr>
+      <tr><td>Over $50</td><td>+15 points</td></tr>
+      <tr><td>Over $100</td><td>+500 points</td></tr>
+      <tr><td>Over $1,000</td><td>+2,000 points</td></tr>
+      <tr><td>Over $2,000</td><td>+5,000 points</td></tr>
+    </table>
+    <h2>GST Quick Reference</h2>
+    <ul>
+      <li>Always enter amounts <strong>including GST</strong></li>
+      <li>Australian GST rate: 10% (divisor ÷11)</li>
+      <li>GST = Amount ÷ 11 &nbsp;|&nbsp; Ex-GST = Amount − GST</li>
+    </ul>
+    <div class="tip">💡 Export a PDF from My Logs at the end of each quarter for your BAS records.</div>
+    <div class="footer"><span>Smart GST Tracker — Setup Guide · v1.8.2 · Endless Digital World</span><span>Page 7 of 7</span></div>
+  </div>
+
+  <${'script'}>window.onload = () => window.print();</${'script'}>
+  </body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+let rearrangeMode = false;
+function toggleRearrangeMode() {
+  rearrangeMode = !rearrangeMode;
+  const btn = document.getElementById('rearrange-btn');
+  if (rearrangeMode) {
+    btn.style.color = 'var(--accent)';
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.background = 'rgba(240,180,41,0.1)';
+    btn.textContent = '✓ Done Rearranging';
+    toast('Drag ☰ handles to reorder categories', 'info');
+  } else {
+    btn.style.color = 'var(--muted)';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'var(--card)';
+    btn.textContent = '⇅ Rearrange';
+  }
+  renderCatModalList();
+}
+
+
+
+// ── INCOME MODE ───────────────────────────────────────────────────────────
+let incomeMode = null; // 'weekly' | 'monthly' | 'category'
+let selectedIncCat = null;
+
+const DEFAULT_INC_CATS = [
+  {name:'Uber',      icon:'🚗'},
+  {name:'DoorDash',  icon:'🍕'},
+  {name:'Freelance', icon:'💻'},
+];
+
+function getIncCategories() {
+  return JSON.parse(localStorage.getItem('gst_inc_categories') || 'null') || DEFAULT_INC_CATS.map(c=>({...c}));
+}
+function saveIncCategories(cats) {
+  localStorage.setItem('gst_inc_categories', JSON.stringify(cats));
+}
+
+function setIncomeMode(mode) {
+  incomeMode = mode;
+  selectedPeriod = null;
+  selectedIncCat = null;
+  // Update mode buttons
+  document.querySelectorAll('.inc-mode-btn').forEach(el => el.classList.remove('selected-income'));
+  const btn = document.getElementById('mode-' + mode);
+  if (btn) btn.classList.add('selected-income');
+  // Show/hide sections
+  ['weekly','monthly','category'].forEach(m => {
+    const el = document.getElementById('inc-mode-' + m);
+    if (el) el.style.display = m === mode ? '' : 'none';
+  });
+  if (mode === 'weekly') buildWeeklyPeriodGrid();
+  if (mode === 'category') buildIncCatGrid();
+}
+
+function getDaysInMonth(monthName, year) {
+  const idx = ["January","February","March","April","May","June",
+               "July","August","September","October","November","December"].indexOf(monthName);
+  if (idx < 0) return 31;
+  return new Date(year, idx + 1, 0).getDate();
+}
+
+function buildWeeklyPeriodGrid() {
+  const grid = document.getElementById('weekly-period-grid');
+  if (!grid) return;
+  const monthName = document.getElementById('inc-month').value;
+  const year = new Date().getFullYear();
+  const days = getDaysInMonth(monthName, year);
+
+  // Week ranges: W1 1-7, W2 8-14, W3 15-21, W4 22-end
+  const weeks = [
+    { label: `Week 1 (1–7)`,    val: `Week 1 (1–7)`,    show: 7 <= days },
+    { label: `Week 2 (8–14)`,   val: `Week 2 (8–14)`,   show: 8 <= days },
+    { label: `Week 3 (15–21)`,  val: `Week 3 (15–21)`,  show: 15 <= days },
+    { label: `Week 4 (22–${days})`, val: `Week 4 (22–${days})`, show: 22 <= days },
+  ];
+  grid.innerHTML = weeks.filter(w => w.show).map(w =>
+    `<div class="period-option" onclick="selectPeriod('${w.val}')">${w.label}</div>`
+  ).join('');
+}
+
+function buildIncCatGrid() {
+  const grid = document.getElementById('inc-cat-grid');
+  if (!grid) return;
+  const cats = getIncCategories();
+  selectedIncCat = null;
+  grid.innerHTML = '';
+  cats.forEach(cat => {
+    const btn = document.createElement('div');
+    btn.className = 'cat-btn';
+    btn.id = 'incat-' + cat.name.replace(/[^a-zA-Z0-9]/g,'_');
+    btn.innerHTML = `<span class="cat-icon">${cat.icon}</span>${cat.name}`;
+    btn.onclick = () => selectIncCat(cat.name);
+    grid.appendChild(btn);
+  });
+}
+
+function selectIncCat(name) {
+  selectedIncCat = name;
+  selectedPeriod = name; // period = category name for sheet logging
+  document.querySelectorAll('#inc-cat-grid .cat-btn').forEach(el => el.classList.remove('selected'));
+  const safe = name.replace(/[^a-zA-Z0-9]/g,'_');
+  const el = document.getElementById('incat-' + safe);
+  if (el) el.classList.add('selected');
+}
+
+function openIncCatModal() {
+  renderIncCatModalList();
+  document.getElementById('inc-cat-modal').classList.add('open');
+}
+function closeIncCatModal() {
+  document.getElementById('inc-cat-modal').classList.remove('open');
+  document.getElementById('new-inc-cat-input').value = '';
+}
+function renderIncCatModalList() {
+  const cats = getIncCategories();
+  const list = document.getElementById('inc-cat-modal-list');
+  list.innerHTML = cats.map((cat, i) => `
+    <div class="cat-list-item" style="cursor:default;">
+      <div class="cat-list-left">
+        <span style="width:23px;display:inline-block;"></span>
+        <span class="cat-list-icon">${cat.icon}</span>
+        <span>${cat.name}</span>
+        ${cat.isDefault ? '<span class="cat-default-tag">default</span>' : ''}
+      </div>
+      <button class="cat-delete-btn" onclick="deleteIncCategory(${i})" title="Remove">✕</button>
+    </div>`).join('');
+}
+function addIncomeCategory() {
+  const input = document.getElementById('new-inc-cat-input');
+  const name = input.value.trim();
+  if (!name) return toast('Please enter a category name.', 'error');
+  const cats = getIncCategories();
+  const icon = getEmojiForName(name);
+  cats.push({name, icon, isDefault: false});
+  saveIncCategories(cats);
+  input.value = '';
+  renderIncCatModalList();
+  buildIncCatGrid();
+  toast(`✅ "${name}" ${icon} added!`, 'success');
+}
+function deleteIncCategory(index) {
+  const cats = getIncCategories();
+  const cat = cats[index];
+  cats.splice(index, 1);
+  saveIncCategories(cats);
+  renderIncCatModalList();
+  buildIncCatGrid();
+  toast(`Removed "${cat.name}"`, 'info');
+}
+
+// Rebuild weekly grid when month changes
+document.addEventListener('DOMContentLoaded', () => {
+  const incMonthSel = document.getElementById('inc-month');
+  if (incMonthSel) {
+    incMonthSel.addEventListener('change', () => {
+      if (incomeMode === 'weekly') buildWeeklyPeriodGrid();
+    });
+  }
+});
+
+// ── EMAIL VERIFICATION ────────────────────────────────────────────────────
+let _evOTP = '';
+let _evEmail = '';
+
+function showEmailVerify(onComplete) {
+  const screen = document.getElementById('email-verify-screen');
+  screen.style.display = 'flex';
+  window._evOnComplete = onComplete;
+  // Reset to step 1
+  document.getElementById('ev-step1').style.display = '';
+  document.getElementById('ev-step2').style.display = 'none';
+  document.getElementById('ev-email-input').value = '';
+  document.getElementById('ev-email-error').textContent = '';
+}
+
+// ── EMAILJS CONFIG ────────────────────────────────────────────────────────
+const EDW_EMAILJS_SERVICE  = 'service_eow5nxm';
+const EDW_EMAILJS_TEMPLATE = '2kt49hy';
+const EDW_EMAILJS_KEY      = 'K9cjki5adgiiwx38U';
+
+function initEmailJS() {
+  if (window.emailjs) emailjs.init({ publicKey: EDW_EMAILJS_KEY });
+}
+
+// Silent background call — sends new user name + email to EDW inbox
+async function silentlyRegisterUser(name, email) {
+  try {
+    initEmailJS();
+    await emailjs.send(EDW_EMAILJS_SERVICE, EDW_EMAILJS_TEMPLATE, {
+      user_name:  name,
+      user_email: email,
+      date:       new Date().toLocaleString('en-AU')
+    });
+  } catch(e) {
+    // Silent — user never sees this
+  }
+}
+
+let _evTimerInterval = null;
+
+async function sendVerificationOTP() {
+  const email = document.getElementById('ev-email-input').value.trim();
+  const err = document.getElementById('ev-email-error');
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = 'Please enter a valid email address.';
+    return;
+  }
+  err.textContent = '';
+
+  _evEmail = email;
+  _evOTP = String(Math.floor(100000 + Math.random() * 900000));
+  _evExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+  // Show the code on screen
+  document.getElementById('ev-email-display').textContent = email;
+  document.getElementById('ev-code-display').textContent = _evOTP;
+  document.getElementById('ev-step1').style.display = 'none';
+  document.getElementById('ev-step2').style.display = '';
+
+  // Build OTP input boxes
+  buildOTPBoxes();
+  setTimeout(() => { const f = document.getElementById('ev-otp-0'); if(f) f.focus(); }, 100);
+
+  // Start countdown timer
+  startOTPTimer();
+}
+
+let _evExpiry = 0;
+
+function startOTPTimer() {
+  if (_evTimerInterval) clearInterval(_evTimerInterval);
+  _evTimerInterval = setInterval(() => {
+    const remaining = Math.max(0, _evExpiry - Date.now());
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    const timerEl = document.getElementById('ev-timer');
+    if (timerEl) timerEl.textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+    if (remaining <= 0) {
+      clearInterval(_evTimerInterval);
+      // Expire the code
+      _evOTP = '';
+      const codeEl = document.getElementById('ev-code-display');
+      if (codeEl) { codeEl.textContent = '——————'; codeEl.style.color = 'var(--muted)'; }
+      const err = document.getElementById('ev-otp-error');
+      if (err) err.textContent = '⏱️ Code expired — tap "Generate new code" to get a new one.';
+    }
+  }, 500);
+}
+
+function buildOTPBoxes() {
+  const container = document.getElementById('ev-otp-boxes');
+  container.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 1;
+    inp.inputMode = 'numeric';
+    inp.id = 'ev-otp-' + i;
+    inp.style.cssText = 'width:44px;height:52px;text-align:center;font-size:22px;font-weight:700;background:var(--card);border:2px solid var(--border);border-radius:10px;color:var(--text);font-family:\'DM Sans\',sans-serif;';
+    inp.addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g,'');
+      if (e.target.value && i < 5) document.getElementById('ev-otp-' + (i+1)).focus();
+      // Auto-verify when all 6 filled
+      const all = Array.from({length:6}, (_,j) => (document.getElementById('ev-otp-'+j)?.value||'')).join('');
+      if (all.length === 6) verifyOTP();
+    });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !e.target.value && i > 0) document.getElementById('ev-otp-' + (i-1)).focus();
+    });
+    container.appendChild(inp);
+  }
+}
+
+function resendOTP() {
+  _evOTP = String(Math.floor(100000 + Math.random() * 900000));
+  _evExpiry = Date.now() + 5 * 60 * 1000;
+  const codeEl = document.getElementById('ev-code-display');
+  if (codeEl) { codeEl.textContent = _evOTP; codeEl.style.color = 'var(--accent)'; }
+  buildOTPBoxes();
+  setTimeout(() => { const f = document.getElementById('ev-otp-0'); if(f) f.focus(); }, 100);
+  document.getElementById('ev-otp-error').textContent = '';
+  startOTPTimer();
+  toast('🔄 New code generated!', 'success');
+}
+
+function backToEmail() {
+  document.getElementById('ev-step1').style.display = '';
+  document.getElementById('ev-step2').style.display = 'none';
+}
+
+function verifyOTP() {
+  const entered = Array.from({length:6}, (_,i) => (document.getElementById('ev-otp-'+i).value || '')).join('');
+  const err = document.getElementById('ev-otp-error');
+  if (entered.length < 6) { err.textContent = 'Please enter all 6 digits.'; return; }
+  if (entered !== _evOTP) { err.textContent = '❌ Incorrect code. Please try again.'; return; }
+  err.textContent = '';
+  if (_evTimerInterval) clearInterval(_evTimerInterval);
+  // Mark verified
+  localStorage.setItem('edw_email_verified', 'true');
+  localStorage.setItem('edw_verified_email', _evEmail);
+  document.getElementById('email-verify-screen').style.display = 'none';
+  toast('✅ Email verified!', 'success');
+  if (window._evOnComplete) window._evOnComplete(_evEmail);
+}
+
+let toastTimer;
+function toast(msg, type='info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+</script>
+</body>
+</html>
